@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.env
+.env.local
+data/tickets.json
+*.log
+
+# agent local state (may hold credentials/session data)
+.claude/settings.local.json
