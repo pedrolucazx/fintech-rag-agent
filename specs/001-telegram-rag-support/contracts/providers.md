@@ -8,10 +8,14 @@ qual está ativo.
 ## LLM (`src/llm.ts`)
 
 ```ts
-type ChatMessage = { role: "system" | "user" | "assistant" | "tool"; content: string };
+type ChatMessage = {
+  role: "system" | "user" | "assistant" | "tool";
+  content: string;
+  toolCall?: { id?: string; name: string; args: object } | null;
+};
 type ToolSchema = { name: string; description: string; parameters: object };
 type ChatResult =
-  | { type: "tool_call"; name: string; args: object }
+  | { type: "tool_call"; id?: string; name: string; args: object }
   | { type: "text"; content: string };
 
 function chat(messages: ChatMessage[], tools: ToolSchema[]): Promise<ChatResult>;
@@ -27,6 +31,11 @@ function chat(messages: ChatMessage[], tools: ToolSchema[]): Promise<ChatResult>
 | `gemini` | `https://generativelanguage.googleapis.com/v1beta/openai/` | `GEMINI_API_KEY` |
 
 **Contract rules**:
+- O adapter preserva o `id` da chamada do provider. O harness registra a
+  chamada do assistente e o resultado com esse mesmo `id` (gera um se ausente
+  em adapters simulados); o adapter os serializa como `tool_calls` e
+  `tool_call_id`. Chamadas paralelas são desativadas porque o loop executa uma
+  tool por vez.
 - `chat()` SEMPRE passa por `cache.ts` antes de fazer a chamada de rede —
   mesma tupla `(provider, messages, tools)` dentro do TTL retorna do cache,
   sem nova chamada.
