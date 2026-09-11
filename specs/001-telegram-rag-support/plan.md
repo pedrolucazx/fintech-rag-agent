@@ -1,4 +1,4 @@
-# Implementation Plan: Agente de Suporte Fintech via Telegram (RAG + Tools)
+# Implementation Plan: Bot de Atendimento Financeiro via Telegram (RAG + Tools)
 
 **Branch**: `001-telegram-rag-support` | **Date**: 2026-09-10 | **Spec**: [spec.md](./spec.md)
 
@@ -6,10 +6,12 @@
 
 ## Summary
 
-Bot no Telegram que responde perguntas sobre documentação de pagamentos
-(PIX/Bacen, Celcoin, Stripe) fundamentando respostas via RAG, e executa duas
-ações via tool-calling (consultar status de transação simulada, abrir chamado
-de suporte simulado), mantendo contexto de conversa multi-turno. O loop de
+Bot no Telegram que simula o atendimento financeiro de uma operadora de
+telecom fictícia ("ConectaNet") ao cliente final: responde perguntas sobre
+fatura e pagamento (PIX/boleto) fundamentando respostas via RAG sobre
+regulamento PIX/Bacen + FAQ de faturamento, e executa duas ações via
+tool-calling (consultar status da própria fatura, abrir chamado sobre
+dúvida de cobrança), mantendo contexto de conversa multi-turno. O loop de
 decisão (RAG vs tool vs pedir mais info) é um harness escrito à mão — sem
 framework de orquestração de agentes — rodando inteiramente em serviços
 gratuitos.
@@ -41,7 +43,7 @@ poucos segundos é aceitável (não há requisito de baixa latência de produç�
 escrito à mão (sem LangChain/LangGraph/ADK); sem Docker/CI-CD/deploy
 hospedado (fora de escopo, ver constitution)
 
-**Scale/Scope**: Corpus pequeno (3 fontes de documentação, dezenas de
+**Scale/Scope**: Corpus pequeno (2 fontes de documentação, dezenas de
 chunks); demo pessoal/portfólio, não precisa suportar múltiplos usuários
 simultâneos
 
@@ -89,9 +91,8 @@ src/
 
 data/
 ├── docs/
-│   ├── pix-bacen/     # corpus PIX/Bacen (.md)
-│   ├── celcoin/        # corpus Celcoin (.md)
-│   └── stripe/          # corpus Stripe (.md)
+│   ├── pix-bacen/            # regulamento PIX/Bacen (.md)
+│   └── faturamento-conectanet/  # FAQ de faturamento da operadora fictícia (.md)
 ├── index/               # índice gerado pelo vectra (gitignored, reconstruível via script de ingest)
 └── tickets.json         # chamados simulados (gitignored, gerado em runtime)
 

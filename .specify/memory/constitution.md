@@ -1,15 +1,14 @@
 <!--
 Sync Impact Report
-- Version change: (none) → 1.0.0
-- Modified principles: n/a (initial ratification)
-- Added sections: Core Principles (I-VI), Stack e Escopo Técnico, Development Workflow, Governance
+- Version change: 1.0.0 → 1.1.0
+- Modified principles: IV. RAG Multi-Fonte com Proveniência (exemplo de fontes trocado de Bacen/Celcoin/Stripe para Bacen/PIX + FAQ de faturamento — persona virou cliente final, não desenvolvedor de integração)
+- Added sections: "Persona e Domínio do Produto" (dentro de Stack e Escopo Técnico)
 - Removed sections: none
 - Templates requiring updates:
-  - ✅ .specify/templates/plan-template.md (generic Constitution Check gate, no changes needed)
+  - ✅ .specify/templates/plan-template.md (generic, no changes needed)
   - ✅ .specify/templates/spec-template.md (generic, no changes needed)
-  - ✅ .specify/templates/tasks-template.md (generic task categories already cover test-first / polish)
-  - ✅ .claude/skills/speckit-*/SKILL.md (agent-agnostic, no CLAUDE-only references found)
-  - ✅ docs/plano.md (source plan already aligned with these principles; no edits required)
+  - ✅ .specify/templates/tasks-template.md (generic, no changes needed)
+  - ✅ specs/001-telegram-rag-support/ (spec, plan, data-model, contracts, tasks reescritos na mesma mudança)
 - Follow-up TODOs: none
 -->
 
@@ -48,11 +47,12 @@ peça existente — não se somam à stack "por via das dúvidas".
 
 ### IV. RAG Multi-Fonte com Proveniência
 O corpus de RAG aceita múltiplos documentos de origens diferentes (ex.:
-Bacen/PIX, Celcoin, Stripe) organizados em `data/docs/<fonte>/`. Cada chunk
-indexado carrega metadado de origem (`source`, `path`). Respostas fundamentadas
-em recuperação devem poder referenciar de qual fonte o trecho veio. Rationale:
-permite responder perguntas que cruzam fontes e demonstra domínio de RAG além
-de um único documento — sem isso, "multi-fonte" vira só uma pasta com PDFs soltos.
+regulamento PIX/Bacen + FAQ de faturamento da operadora) organizados em
+`data/docs/<fonte>/`. Cada chunk indexado carrega metadado de origem
+(`source`, `path`). Respostas fundamentadas em recuperação devem poder
+referenciar de qual fonte o trecho veio. Rationale: permite responder
+perguntas que cruzam fontes e demonstra domínio de RAG além de um único
+documento — sem isso, "multi-fonte" vira só uma pasta com PDFs soltos.
 
 ### V. Qualidade "Prod-Relevante" Só Onde Importa
 Aplicar rigor de produção apenas nos pontos que realmente importam: segredos
@@ -79,13 +79,29 @@ projeto de produção.
 Node.js + TypeScript. Telegram via `grammy`. LLM via NVIDIA NIM (endpoint
 OpenAI-compatible, key `nvapi-` já em uso no projeto irmão `pac-mentor`).
 Embeddings via `@xenova/transformers` (local, sem custo de API). Vector store
-via `vectra` (arquivo local). Corpus inicial: doc pública PIX/Bacen, doc
-Celcoin, doc Stripe (webhooks/idempotência), todos organizados em
-`data/docs/<fonte>/`. Tools mockadas (sem integração externa real):
-`consultar_status_transacao`, `abrir_ticket`. Fora de escopo: WhatsApp (ver
-`docs/plano.md` para o motivo — risco de ban e proximidade indevida com
+via `vectra` (arquivo local). Corpus inicial: regulamento público PIX/Bacen +
+FAQ de faturamento de uma operadora de telecom fictícia ("ConectaNet"),
+organizados em `data/docs/<fonte>/`. Tools mockadas (sem integração externa
+real): `consultar_status_fatura`, `abrir_ticket`. Fora de escopo: WhatsApp
+(ver `docs/plano.md` para o motivo — risco de ban e proximidade indevida com
 trabalho confidencial de terceiro), qualquer framework de agente pronto,
 deploy hospedado.
+
+## Persona e Domínio do Produto
+
+O bot simula o atendimento financeiro de uma operadora de internet/telecom
+**fictícia** ("ConectaNet") ao **cliente final** — não um bot de suporte a
+desenvolvedor integrando uma API de pagamentos. A persona é inspirada no
+fluxo real de faturamento de operadoras brasileiras (aba "Financeiro": 2ª
+via de fatura, pagamento por PIX/boleto/cartão/débito automático, consulta
+de status de pagamento, abertura de chamado sobre cobrança) — pesquisado
+publicamente, sem usar nome, marca ou material interno de nenhuma empresa
+real. Rationale: essa persona é universalmente reconhecível em entrevista
+(qualquer pessoa entende "bot que responde dúvida de fatura e PIX de um
+cliente"), evita depender de documentação de terceiro fora de contexto, e
+mantém os dois tools (`consultar_status_fatura`, `abrir_ticket`) naturais
+para quem os usa — sem precisar de nenhuma justificativa adicional de "por
+que esse tool existe".
 
 ## Development Workflow
 
@@ -94,7 +110,7 @@ Fluxo Spec-Driven Development via GitHub Spec Kit:
 feature) → `/speckit-plan` (plano técnico) → `/speckit-tasks` (quebra em
 tasks executáveis) → `/speckit-implement` (execução). Escopo incremental em
 três entregas demonstráveis independentemente: MVP (RAG puro) → v2 (+ tool
-`consultar_status_transacao`) → v3 (+ tool `abrir_ticket` + loop
+`consultar_status_fatura`) → v3 (+ tool `abrir_ticket` + loop
 multi-turno completo) — ver `docs/plano.md`.
 
 Commits em português, sem co-autoria da IA (nenhuma linha `Co-Authored-By:
@@ -113,4 +129,4 @@ material, PATCH para clarificação/redação. Specs e plans gerados pelo
 `/speckit-plan` devem incluir uma checagem explícita de conformidade com os
 Core Principles antes de avançar para tasks.
 
-**Version**: 1.0.0 | **Ratified**: 2026-09-10 | **Last Amended**: 2026-09-10
+**Version**: 1.1.0 | **Ratified**: 2026-09-10 | **Last Amended**: 2026-09-10

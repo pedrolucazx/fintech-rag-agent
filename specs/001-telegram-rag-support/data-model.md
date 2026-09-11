@@ -11,7 +11,7 @@ Representa um fragmento indexado de uma fonte de documentação.
 | Campo | Tipo | Descrição |
 |---|---|---|
 | `id` | string | Identificador único do chunk |
-| `source` | string | Fonte de origem (`pix-bacen`, `celcoin`, `stripe`, ...) — obrigatório, sustenta FR-002 |
+| `source` | string | Fonte de origem (`pix-bacen`, `faturamento-conectanet`, ...) — obrigatório, sustenta FR-002 |
 | `path` | string | Caminho do arquivo original em `data/docs/<source>/` |
 | `text` | string | Conteúdo textual do fragmento |
 | `embedding` | number[] | Vetor de embedding do `text`, gerado por `@xenova/transformers` |
@@ -40,24 +40,25 @@ continuidade multi-turno (FR-006, SC-005).
 em memória durante a vida do processo (ver Assumptions em `spec.md`: sem
 requisito de persistência entre reinícios).
 
-## SimulatedTransaction (Transação simulada)
+## SimulatedInvoice (Fatura simulada)
 
-Registro fictício de pagamento usado pela tool `consultar_status_transacao`.
-Consultada como ferramenta de diagnóstico de integração (ex.: desenvolvedor
-reconciliando o status real com o que um webhook informou) — não é
-autoatendimento do usuário final.
+Registro fictício de cobrança usado pela tool `consultar_status_fatura`.
+Consultada diretamente pelo cliente final sobre a própria fatura —
+autoatendimento, sem necessidade de framing adicional de persona.
 
 | Campo | Tipo | Descrição |
 |---|---|---|
-| `id` | string | Identificador da transação, informado pelo usuário |
-| `status` | `"pendente" \| "aprovado" \| "recusado"` | Status simulado |
+| `id` | string | Identificador da fatura, informado pelo cliente |
+| `status` | `"pendente" \| "paga" \| "vencida"` | Status simulado |
+| `valor` | number | Valor da fatura (centavos ou reais, decisão de implementação) |
+| `vencimento` | string | Data de vencimento (ISO `YYYY-MM-DD`) |
 
 **Validation rules**: se `id` não existir no conjunto de dados simulados, a
 tool retorna explicitamente "não encontrado" (alimenta o Edge Case de
 FR-004/Acceptance Scenario 2 da User Story 2 — não é erro, é um resultado
 válido).
 
-## SupportTicket (Chamado de suporte)
+## SupportTicket (Chamado sobre dúvida de cobrança)
 
 Registro criado pela tool `abrir_ticket`.
 

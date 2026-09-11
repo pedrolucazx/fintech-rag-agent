@@ -4,19 +4,19 @@ Estas são as únicas interfaces externas do sistema (não há API HTTP pública
 — o "contrato" relevante é o schema de tool-calling que o harness expõe ao
 LLM, definido em `src/tools.ts`).
 
-## `consultar_status_transacao`
+## `consultar_status_fatura`
 
 Cobre User Story 2 / FR-004.
 
 **Input (JSON schema)**:
 ```json
 {
-  "name": "consultar_status_transacao",
-  "description": "Consulta o status real de uma transação PIX junto ao provedor, a partir do identificador. Uso de diagnóstico de integração (ex.: reconciliar com o que um webhook informou), não autoatendimento do usuário final.",
+  "name": "consultar_status_fatura",
+  "description": "Consulta o status da fatura/pagamento do próprio cliente a partir do identificador informado",
   "parameters": {
     "type": "object",
     "properties": {
-      "id": { "type": "string", "description": "Identificador da transação" }
+      "id": { "type": "string", "description": "Identificador da fatura" }
     },
     "required": ["id"]
   }
@@ -25,19 +25,19 @@ Cobre User Story 2 / FR-004.
 
 **Output**:
 ```json
-{ "id": "12345", "status": "aprovado" }
+{ "id": "fat_202509", "status": "paga", "valor": 99.9, "vencimento": "2026-09-10" }
 ```
 ou, se não encontrado:
 ```json
-{ "id": "99999", "status": "nao_encontrado" }
+{ "id": "fat_000000", "status": "nao_encontrado" }
 ```
 
 **Contract rules**:
 - Nunca lança exceção para "não encontrado" — é um resultado válido (ver
-  data-model.md → SimulatedTransaction).
+  data-model.md → SimulatedInvoice).
 - Se o harness chamar esta tool sem `id` resolvido na conversa, o LLM deve
-  ter perguntado o `id` ao usuário antes (responsabilidade do harness/prompt,
-  não da tool).
+  ter perguntado o `id` (ou o mês de referência) ao cliente antes
+  (responsabilidade do harness/prompt, não da tool).
 
 ## `abrir_ticket`
 
@@ -47,12 +47,12 @@ Cobre User Story 3 / FR-005.
 ```json
 {
   "name": "abrir_ticket",
-  "description": "Abre um chamado de suporte com o assunto e descrição do problema relatado pelo usuário",
+  "description": "Abre um chamado sobre dúvida de cobrança com o assunto e descrição do problema relatado pelo cliente",
   "parameters": {
     "type": "object",
     "properties": {
       "subject": { "type": "string", "description": "Resumo curto do problema" },
-      "description": { "type": "string", "description": "Descrição detalhada do problema, incluindo dados relevantes já mencionados na conversa (ex.: id de transação)" }
+      "description": { "type": "string", "description": "Descrição detalhada do problema, incluindo dados relevantes já mencionados na conversa (ex.: id de fatura)" }
     },
     "required": ["subject", "description"]
   }

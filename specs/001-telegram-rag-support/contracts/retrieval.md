@@ -5,7 +5,7 @@ User Story 1 / FR-001, FR-002, FR-003.
 
 ## `retrieve(query: string, topK?: number): RetrievedChunk[]`
 
-**Input**: pergunta em linguagem natural do usuário (texto bruto, sem
+**Input**: pergunta em linguagem natural do cliente (texto bruto, sem
 pré-processamento externo).
 
 **Output**: lista ordenada por relevância (mais relevante primeiro):

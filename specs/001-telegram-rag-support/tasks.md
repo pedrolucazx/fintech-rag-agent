@@ -1,11 +1,11 @@
-# Tasks: Agente de Suporte Fintech via Telegram (RAG + Tools)
+# Tasks: Bot de Atendimento Financeiro via Telegram (RAG + Tools)
 
 **Input**: Design documents from `/specs/001-telegram-rag-support/`
 
 **Prerequisites**: plan.md, spec.md, research.md, data-model.md, contracts/, quickstart.md
 
-**Tests**: incluídos — Constitution Principle VI exige teste mínimo (`node:test`)
-para toda lógica não-trivial (harness, retrieval, tools).
+**Tests**: incluídos — Constitution Principle VI exige teste mínimo
+(`node:test`) para toda lógica não-trivial (harness, retrieval, tools).
 
 **Organization**: tasks agrupadas por user story (spec.md), cada fase é um
 incremento demonstrável de forma independente.
@@ -27,7 +27,7 @@ na raiz do repositório.
 
 **Purpose**: inicialização do projeto Node/TS
 
-- [ ] T001 Criar estrutura de diretórios per plan.md: `src/`, `data/docs/pix-bacen/`, `data/docs/celcoin/`, `data/docs/stripe/`, `data/index/`, `scripts/`
+- [ ] T001 Criar estrutura de diretórios per plan.md: `src/`, `data/docs/pix-bacen/`, `data/docs/faturamento-conectanet/`, `data/index/`, `scripts/`
 - [ ] T002 Inicializar projeto Node com `package.json` + `tsconfig.json` (TypeScript 5, target Node 20)
 - [ ] T003 [P] Instalar dependências de runtime: `grammy`, `openai`, `@xenova/transformers`, `vectra`
 - [ ] T004 [P] Instalar dependências de dev: `typescript`, `tsx` (execução direta de TS), `@types/node`
@@ -59,11 +59,13 @@ Telegram↔harness↔LLM antes de empilhar RAG e tools por cima.
 
 ## Phase 3: User Story 1 - Responder dúvidas fundamentadas em documentação (Priority: P1) 🎯 MVP
 
-**Goal**: respostas fundamentadas em documentação real multi-fonte, com
-fallback explícito de "não sei" quando não há contexto relevante.
+**Goal**: respostas fundamentadas em documentação real multi-fonte
+(regulamento PIX/Bacen + FAQ de faturamento da operadora fictícia
+"ConectaNet"), com fallback explícito de "não sei" quando não há contexto
+relevante.
 
 **Independent Test**: enviar pergunta coberta por uma fonte, pergunta que
-cruza duas fontes, e pergunta fora do corpus — ver `quickstart.md` → US1.
+cruza as duas fontes, e pergunta fora do corpus — ver `quickstart.md` → US1.
 
 ### Tests for User Story 1
 
@@ -71,37 +73,35 @@ cruza duas fontes, e pergunta fora do corpus — ver `quickstart.md` → US1.
 
 ### Implementation for User Story 1
 
-- [ ] T015 [P] [US1] Popular `data/docs/pix-bacen/`, `data/docs/celcoin/`, `data/docs/stripe/` com pelo menos um documento de referência cada (conteúdo real, não placeholder)
+- [ ] T015 [P] [US1] Popular `data/docs/pix-bacen/` (regulamento PIX real — tipos de chave, limites, devolução/MED) e `data/docs/faturamento-conectanet/` (FAQ fictício de faturamento: 2ª via, formas de pagamento PIX/boleto/cartão/débito automático, prazos) com conteúdo real, não placeholder
 - [ ] T016 [US1] Implementar `scripts/ingest.ts`: lê `data/docs/**`, faz chunking, gera embeddings via `@xenova/transformers`, popula índice `vectra` em `data/index/` com metadado `source`/`path` (data-model.md → DocumentChunk)
 - [ ] T017 [US1] Implementar `retrieve(query, topK?)` em `src/rag.ts` per contracts/retrieval.md (carrega índice `vectra`, embeda a query, retorna `RetrievedChunk[]` com `source`+`score`, filtra por limiar mínimo)
 - [ ] T018 [US1] Integrar RAG ao harness: em `src/harness.ts`, injetar os `RetrievedChunk[]` recuperados no contexto antes de chamar o LLM; system prompt instrui a responder só com base no contexto e dizer que não sabe se a lista vier vazia (FR-003)
 - [ ] T019 [US1] Validação manual: rodar os 3 cenários de `quickstart.md` → US1
 
 **Checkpoint**: MVP completo e demonstrável — bot responde no Telegram com
-respostas fundamentadas em documentação real de múltiplas fontes.
+respostas fundamentadas em documentação real de fatura/PIX.
 
 ---
 
-## Phase 4: User Story 2 - Conferir status real de uma transação para depurar webhook (Priority: P2)
+## Phase 4: User Story 2 - Consultar status da própria fatura/pagamento (Priority: P2)
 
 **Goal**: o bot decide dinamicamente entre responder via RAG e executar uma
-ação (consulta), em vez de só recuperar texto — usada como diagnóstico de
-integração (reconciliação webhook vs. provedor), não autoatendimento do
-usuário final.
+ação (consulta), em vez de só recuperar texto — o cliente pergunta
+diretamente pela própria fatura, sem necessidade de framing adicional.
 
-**Independent Test**: relatar um problema de webhook informando o id de uma
-transação existente e de uma inexistente, e sem informar o id — ver
-`quickstart.md` → US2.
+**Independent Test**: perguntar status de uma fatura existente e de uma
+inexistente, e sem informar o id — ver `quickstart.md` → US2.
 
 ### Tests for User Story 2
 
-- [ ] T020 [P] [US2] Teste da tool `consultar_status_transacao`: id existente → status correspondente, id inexistente → `nao_encontrado` (per contracts/tools.md) em `src/tools.test.ts`
+- [ ] T020 [P] [US2] Teste da tool `consultar_status_fatura`: id existente → status/valor/vencimento correspondentes, id inexistente → `nao_encontrado` (per contracts/tools.md) em `src/tools.test.ts`
 
 ### Implementation for User Story 2
 
-- [ ] T021 [P] [US2] Implementar schema + dados simulados + execução de `consultar_status_transacao` em `src/tools.ts` (per contracts/tools.md e data-model.md → SimulatedTransaction)
+- [ ] T021 [P] [US2] Implementar schema + dados simulados + execução de `consultar_status_fatura` em `src/tools.ts` (per contracts/tools.md e data-model.md → SimulatedInvoice)
 - [ ] T022 [US2] Registrar a tool no harness: `src/harness.ts` passa o schema ao LLM na chamada, executa a função local quando o LLM retorna `tool_call`, injeta o resultado de volta no histórico e repete o loop
-- [ ] T023 [US2] Ajustar system prompt para pedir o identificador quando o desenvolvedor relatar um problema de webhook sem informá-lo (Acceptance Scenario 2 da US2)
+- [ ] T023 [US2] Ajustar system prompt para pedir o identificador (ou mês de referência) quando o cliente perguntar status sem informá-lo (Acceptance Scenario 2 da US2)
 - [ ] T024 [US2] Validação manual: rodar os 2 cenários de `quickstart.md` → US2
 
 **Checkpoint**: bot decide dinamicamente entre RAG e tool-call — demonstra a
@@ -109,14 +109,14 @@ diferença entre agente e busca de documentos.
 
 ---
 
-## Phase 5: User Story 3 - Abrir um chamado de suporte (Priority: P3)
+## Phase 5: User Story 3 - Abrir um chamado sobre dúvida de cobrança (Priority: P3)
 
 **Goal**: ciclo completo de agente (ler documentação, consultar estado,
 alterar estado) com continuidade de conversa multi-turno.
 
-**Independent Test**: relatar um problema, confirmar abertura de ticket, e
-emendar uma pergunta que reusa informação já dada na conversa — ver
-`quickstart.md` → US3.
+**Independent Test**: relatar um problema de cobrança, confirmar abertura de
+chamado, e emendar uma pergunta que reusa informação já dada na conversa —
+ver `quickstart.md` → US3.
 
 ### Tests for User Story 3
 
@@ -126,7 +126,7 @@ emendar uma pergunta que reusa informação já dada na conversa — ver
 
 - [ ] T026 [P] [US3] Implementar schema + execução de `abrir_ticket` em `src/tools.ts` (append em `data/tickets.json`)
 - [ ] T027 [US3] Registrar a segunda tool no harness (mesma mecânica de T022, reaproveitada — sem lógica nova de loop)
-- [ ] T028 [US3] Garantir que `src/harness.ts` envia o histórico completo da conversa (não só a última mensagem) em cada chamada ao LLM, para que dados já mencionados (ex.: id de transação) não precisem ser repetidos (FR-006)
+- [ ] T028 [US3] Garantir que `src/harness.ts` envia o histórico completo da conversa (não só a última mensagem) em cada chamada ao LLM, para que dados já mencionados (ex.: id de fatura) não precisem ser repetidos (FR-006)
 - [ ] T029 [US3] Ajustar system prompt para pedir assunto/descrição antes de chamar `abrir_ticket` quando a conversa ainda não tiver essa informação (Acceptance Scenario 2 da US3)
 - [ ] T030 [US3] Validação manual: rodar os 3 cenários de `quickstart.md` → US3
 
@@ -140,7 +140,7 @@ multi-turno.
 - [ ] T031 [P] Escrever `README.md` com setup resumido (link para `quickstart.md`)
 - [ ] T032 Revisar tratamento de erro/timeout nas chamadas ao LLM (`src/llm.ts`) e na execução de tools (`src/tools.ts`) — falha não deve derrubar o processo do bot (Constitution Principle V)
 - [ ] T033 Rodar `quickstart.md` de ponta a ponta (US1+US2+US3 na mesma sessão de conversa) antes de considerar a feature pronta
-- [ ] T034 [P] Confirmar que `npm test` roda `harness.test.ts`, `rag.test.ts` e `tools.test.ts` e todos passam
+- [ ] T034 [P] Confirmar que `npm test` roda todos os `*.test.ts` e todos passam
 
 ---
 
@@ -177,7 +177,7 @@ multi-turno.
 ```bash
 # Em paralelo, arquivos diferentes:
 Task: "Teste de retrieval em src/rag.test.ts (T014)"
-Task: "Popular data/docs/pix-bacen|celcoin|stripe (T015)"
+Task: "Popular data/docs/pix-bacen|faturamento-conectanet (T015)"
 ```
 
 ---

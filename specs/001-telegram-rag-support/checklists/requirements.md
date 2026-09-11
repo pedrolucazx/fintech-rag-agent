@@ -37,3 +37,8 @@
 - Nenhum marcador [NEEDS CLARIFICATION]: decisões de escopo (dados
   simulados, sem autenticação, um usuário por chat) já estavam implícitas no
   plano prévio e foram documentadas em Assumptions.
+- **Revisão 2026-09-10**: persona corrigida de "dev integrando BaaS" para
+  "cliente final de uma operadora fictícia" — resolve de forma natural o
+  motivo de existir das tools (`consultar_status_fatura`, `abrir_ticket`),
+  sem precisar de framing de "diagnóstico". Checklist revalidado, nenhum
+  item volta a falhar.
