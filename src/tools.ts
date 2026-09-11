@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ToolSchema } from "./llm.js";
@@ -66,14 +66,14 @@ type SupportTicket = {
   createdAt: number;
 };
 
-const ticketsPath = fileURLToPath(new URL("../data/tickets.json", import.meta.url));
+const defaultTicketsPath = fileURLToPath(new URL("../data/tickets.json", import.meta.url));
 
 // ponytail: in-process write queue only — concurrent tickets from separate bot
 // instances/replicas can still race on the shared file. Move to a real store
 // (sqlite/DB) if this ever runs as more than one process.
 let ticketQueue: Promise<unknown> = Promise.resolve();
 
-async function appendTicket(ticket: SupportTicket): Promise<void> {
+async function appendTicket(ticket: SupportTicket, ticketsPath: string): Promise<void> {
   let tickets: SupportTicket[] = [];
   try {
     tickets = JSON.parse(await readFile(ticketsPath, "utf8")) as SupportTicket[];
@@ -87,12 +87,19 @@ async function appendTicket(ticket: SupportTicket): Promise<void> {
   }
 
   await mkdir(dirname(ticketsPath), { recursive: true });
-  await writeFile(ticketsPath, `${JSON.stringify([...tickets, ticket], null, 2)}\n`, "utf8");
+  const temporaryPath = `${ticketsPath}.${randomUUID()}.tmp`;
+  try {
+    await writeFile(temporaryPath, `${JSON.stringify([...tickets, ticket], null, 2)}\n`, "utf8");
+    await rename(temporaryPath, ticketsPath);
+  } finally {
+    await rm(temporaryPath, { force: true });
+  }
 }
 
 export async function abrirTicket(
   args: Record<string, unknown>,
   chatId = "",
+  ticketsPath = defaultTicketsPath,
 ): Promise<{ id: string; createdAt: number }> {
   const subject = requireText(args.subject, "Peça ao cliente um assunto para o chamado antes de abrir.");
   const description = requireText(args.description, "Peça ao cliente uma descrição do problema antes de abrir.");
@@ -109,7 +116,7 @@ export async function abrirTicket(
     createdAt,
   };
 
-  const run = ticketQueue.then(() => appendTicket(ticket));
+  const run = ticketQueue.then(() => appendTicket(ticket, ticketsPath));
   ticketQueue = run.catch(() => {});
   await run;
   return { id: ticket.id, createdAt };

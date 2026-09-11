@@ -45,10 +45,6 @@ const toolRegistry: ToolDefinition[] = [
   { schema: abrirTicketSchema, execute: abrirTicket },
 ];
 
-export function registerTool(schema: ToolSchema, execute: ToolDefinition["execute"]): void {
-  toolRegistry.push({ schema, execute });
-}
-
 async function executeTool(name: string, args: Record<string, unknown>, chatId: string): Promise<string> {
   const tool = toolRegistry.find((t) => t.schema.name === name);
   if (!tool) {

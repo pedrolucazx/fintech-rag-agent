@@ -29,6 +29,9 @@ export const config = {
   get llmProvider() {
     return optional("LLM_PROVIDER", "nvidia");
   },
+  get geminiModel() {
+    return optional("GEMINI_MODEL", "gemini-2.5-flash");
+  },
   get geminiApiKey() {
     return optional("GEMINI_API_KEY", "");
   },

@@ -17,6 +17,8 @@ peça.
 - Opcional: `GEMINI_API_KEY` (pra rodar com `LLM_PROVIDER=gemini`) e
   `VOYAGE_API_KEY` (pra rodar com `EMBEDDINGS_PROVIDER=voyage`) — sem elas,
   o bot usa NVIDIA + Xenova (defaults)
+- Modelos de LLM configuráveis por `NVIDIA_MODEL` e `GEMINI_MODEL`; defaults:
+  `nvidia/nemotron-3-super-120b-a12b` e `gemini-2.5-flash`, respectivamente.
 
 ## Setup
 

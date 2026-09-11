@@ -58,3 +58,33 @@ test("NVIDIA model has a supported default and accepts an environment override",
   process.env.NVIDIA_MODEL = "custom-model";
   assert.strictEqual(config.nvidiaModel, "custom-model");
 });
+
+
+test("Gemini sends the configured model and separates its cache entries", async (t) => {
+  const { chat } = await import("./llm.js");
+  const { closeCache } = await import("./cache.js");
+  const previous = { LLM_PROVIDER: process.env.LLM_PROVIDER, GEMINI_MODEL: process.env.GEMINI_MODEL, GEMINI_API_KEY: process.env.GEMINI_API_KEY };
+  t.after(async () => {
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+    await closeCache();
+  });
+  process.env.LLM_PROVIDER = "gemini";
+  process.env.GEMINI_API_KEY = "test-key";
+  delete process.env.GEMINI_MODEL;
+  const models: string[] = [];
+  t.mock.method(globalThis, "fetch", async (input: unknown, init: RequestInit) => {
+    assert.match(String(input), /generativelanguage.googleapis.com/);
+    const body = JSON.parse(init.body as string);
+    models.push(body.model);
+    return Response.json({ choices: [{ message: { content: "ok" } }] });
+  });
+  const messages = [{ role: "user" as const, content: `model-test:${crypto.randomUUID()}` }];
+  assert.deepEqual(await chat(messages, []), { type: "text", content: "ok" });
+  process.env.GEMINI_MODEL = "custom-gemini";
+  await chat(messages, []);
+  await chat(messages, []);
+  assert.deepEqual(models, ["gemini-2.5-flash", "custom-gemini"]);
+});

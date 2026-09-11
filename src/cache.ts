@@ -4,7 +4,7 @@ const REDIS_URL = "redis://localhost:6379";
 
 let client: Redis | undefined;
 function getClient(): Redis {
-  if (!client) {
+  if (!client || client.status === "end") {
     client = new Redis(REDIS_URL, {
       maxRetriesPerRequest: 1,
       retryStrategy: (times) => {

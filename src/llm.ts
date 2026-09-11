@@ -14,7 +14,6 @@ export type ChatResult =
   | { type: "tool_call"; id?: string; name: string; args: Record<string, unknown> }
   | { type: "text"; content: string };
 
-const GEMINI_MODEL = "gemini-1.5-flash";
 const TIMEOUT_MS = 15_000;
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
@@ -49,7 +48,7 @@ function getClient(): OpenAI {
 }
 
 function getModel(): string {
-  return config.llmProvider === "gemini" ? GEMINI_MODEL : config.nvidiaModel;
+  return config.llmProvider === "gemini" ? config.geminiModel : config.nvidiaModel;
 }
 
 function toOpenAiTool(tool: ToolSchema) {

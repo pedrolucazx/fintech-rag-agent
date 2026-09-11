@@ -1,4 +1,7 @@
-import { readFile, writeFile } from "node:fs/promises";
+import fs, { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { syncBuiltinESMExports } from "node:module";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
@@ -7,8 +10,6 @@ import {
   consultarStatusFatura,
   consultarStatusFaturaSchema,
 } from "./tools.js";
-
-const ticketsPath = new URL("../data/tickets.json", import.meta.url);
 
 test("invoice schema matches the tool contract", () => {
   assert.deepEqual(consultarStatusFaturaSchema, {
@@ -56,23 +57,19 @@ test("ticket schema matches the tool contract", () => {
 });
 
 test("appends tickets with the conversation id and returns its identifier", async () => {
-  let original: string | undefined;
+  const directory = await mkdtemp(join(tmpdir(), "tickets-test-"));
+  const ticketsPath = join(directory, "tickets.json");
   try {
-    original = await readFile(ticketsPath, "utf8");
-  } catch (err) {
-    if (!(err instanceof Error && "code" in err && err.code === "ENOENT")) throw err;
-  }
-
-  try {
-    await writeFile(ticketsPath, "[]\n", "utf8");
-    const first = await abrirTicket(
-      { subject: "Cobrança duplicada", description: "A fatura fat_202509 foi debitada duas vezes." },
-      "chat-test",
-    );
-    const second = await abrirTicket(
-      { subject: "Boleto indisponível", description: "A segunda via não aparece no aplicativo." },
-      "chat-test",
-    );
+    const [first, second] = await Promise.all([
+      abrirTicket(
+        { subject: "Cobrança duplicada", description: "A fatura fat_202509 foi debitada duas vezes." },
+        "chat-test", ticketsPath,
+      ),
+      abrirTicket(
+        { subject: "Boleto indisponível", description: "A segunda via não aparece no aplicativo." },
+        "chat-test", ticketsPath,
+      ),
+    ]);
     const tickets = JSON.parse(await readFile(ticketsPath, "utf8")) as Array<Record<string, unknown>>;
 
     assert.equal(tickets.length, 2);
@@ -81,18 +78,40 @@ test("appends tickets with the conversation id and returns its identifier", asyn
     assert.equal(tickets[0].description, "A fatura fat_202509 foi debitada duas vezes.");
     assert.equal(tickets[0].chatId, "chat-test");
   } finally {
-    if (original === undefined) {
-      const { unlink } = await import("node:fs/promises");
-      await unlink(ticketsPath).catch((err: unknown) => {
-        if (!(err instanceof Error && "code" in err && err.code === "ENOENT")) throw err;
-      });
-    } else {
-      await writeFile(ticketsPath, original, "utf8");
-    }
+    await rm(directory, { recursive: true, force: true });
   }
 });
 
 test("rejects tickets without a meaningful subject or description", async () => {
   await assert.rejects(abrirTicket({ subject: "", description: "detalhes" }), /assunto/i);
   await assert.rejects(abrirTicket({ subject: "Assunto", description: " " }), /descrição/i);
+});
+
+test("failed ticket write preserves existing tickets and the queue recovers", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "tickets-failure-"));
+  const ticketsPath = join(directory, "tickets.json");
+  const original = '[{"id":"existing-ticket"}]\n';
+  await writeFile(ticketsPath, original);
+  const actualWrite = fs.writeFile;
+  const failure = t.mock.method(fs, "writeFile", async (path: Parameters<typeof fs.writeFile>[0]) => {
+    await actualWrite(path, "partial");
+    throw new Error("simulated disk failure");
+  });
+  syncBuiltinESMExports();
+  try {
+    await assert.rejects(
+      abrirTicket({ subject: "Assunto", description: "Detalhes" }, "chat-test", ticketsPath),
+      /simulated disk failure/,
+    );
+    assert.equal(await readFile(ticketsPath, "utf8"), original);
+    assert.deepEqual(await readdir(directory), ["tickets.json"]);
+    failure.mock.restore();
+    syncBuiltinESMExports();
+    await abrirTicket({ subject: "Assunto", description: "Detalhes" }, "chat-test", ticketsPath);
+    assert.equal(JSON.parse(await readFile(ticketsPath, "utf8")).length, 2);
+  } finally {
+    failure.mock.restore();
+    syncBuiltinESMExports();
+    await rm(directory, { recursive: true, force: true });
+  }
 });

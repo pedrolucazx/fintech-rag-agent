@@ -1,3 +1,6 @@
+import Redis from "ioredis";
+import { once } from "node:events";
+import { randomUUID } from "node:crypto";
 import { test, describe, before, after } from "node:test";
 import assert from "node:assert";
 import { getOrSet, closeCache } from "./cache.js";
@@ -58,5 +61,20 @@ describe("cache.ts — Redis cache behavior", () => {
     const result2 = await getOrSet(key, 50, fn);
     assert.strictEqual(result2.value, 2);
     assert.strictEqual(callCount, 2);
+  });
+
+  test("recreates an ended connection and caches subsequent calls", async (t) => {
+    const get = t.mock.method(Redis.prototype, "get");
+    await getOrSet(`cache:test:before:${randomUUID()}`, 5000, async () => 0);
+    const redis = get.mock.calls[0].this;
+    assert.ok(redis instanceof Redis);
+    const ended = once(redis, "end");
+    redis.disconnect();
+    await ended;
+    let calls = 0;
+    const key = `cache:test:recovery:${randomUUID()}`;
+    assert.equal(await getOrSet(key, 5000, async () => ++calls), 1);
+    assert.equal(await getOrSet(key, 5000, async () => ++calls), 1);
+    assert.equal(calls, 1);
   });
 });
