@@ -21,12 +21,15 @@ export const DEFAULT_INDEX_DIR = path.join(process.cwd(), "data", "index");
 
 type Extractor = Awaited<ReturnType<typeof pipeline<"feature-extraction">>>;
 
-let extractor: Extractor | undefined;
-async function getExtractor(): Promise<Extractor> {
-  if (!extractor) {
-    extractor = await pipeline("feature-extraction", EMBEDDING_MODEL);
+// Cache the in-flight Promise, not the resolved value — caching the value
+// leaves a window between the `!extractor` check and the `await` where two
+// concurrent embed() calls both see it as unset and each load the model.
+let extractorPromise: Promise<Extractor> | undefined;
+function getExtractor(): Promise<Extractor> {
+  if (!extractorPromise) {
+    extractorPromise = pipeline("feature-extraction", EMBEDDING_MODEL);
   }
-  return extractor;
+  return extractorPromise;
 }
 
 export async function embed(text: string): Promise<number[]> {
