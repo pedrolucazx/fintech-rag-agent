@@ -44,7 +44,8 @@ export async function chat(messages: ChatMessage[], tools: ToolSchema[]): Promis
             if (!toolCall?.id) throw new Error("Missing tool call id");
             return { role, content, tool_call_id: toolCall.id };
           }
-          if (role === "assistant" && toolCall?.id) {
+          if (role === "assistant" && toolCall) {
+            if (!toolCall.id) throw new Error("Missing tool call id");
             return { role, content, tool_calls: [{
               id: toolCall.id,
               type: "function",

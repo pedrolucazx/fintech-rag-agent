@@ -45,10 +45,34 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
 
 type ChatFn = (messages: ChatMessage[], tools: ToolSchema[]) => Promise<ChatResult>;
 
+// ponytail: per-chatId promise chain, not a distributed lock — enough to stop two
+// in-flight messages for the SAME chat from interleaving history.append calls
+// (a real risk since a tool-call round trip awaits an LLM call mid-turn). Different
+// chatIds still run fully concurrently.
+const chatLocks = new Map<string, Promise<unknown>>();
+function withChatLock<T>(chatId: string, fn: () => Promise<T>): Promise<T> {
+  const prev = chatLocks.get(chatId) ?? Promise.resolve();
+  const result = prev.then(fn, fn);
+  chatLocks.set(
+    chatId,
+    result.then(
+      () => undefined,
+      () => undefined,
+    ),
+  );
+  return result;
+}
+
+const MAX_TOOL_ITERATIONS = 5;
+
 export async function runHarness(chatId: string, userMessage: string, chatFn: ChatFn = chat): Promise<string> {
+  return withChatLock(chatId, () => runHarnessTurn(chatId, userMessage, chatFn));
+}
+
+async function runHarnessTurn(chatId: string, userMessage: string, chatFn: ChatFn): Promise<string> {
   history.append(chatId, { role: "user", content: userMessage, toolCall: null, timestamp: Date.now() });
 
-  while (true) {
+  for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
     const messages: ChatMessage[] = [
       systemPrompt,
       ...history.get(chatId).map(({ role, content, toolCall }) => ({ role, content, toolCall })),
@@ -59,7 +83,9 @@ export async function runHarness(chatId: string, userMessage: string, chatFn: Ch
     );
 
     if (result.type === "tool_call") {
-      const toolCall = { id: result.id ?? randomUUID(), name: result.name, args: result.args };
+      // `||`, not `??` — a provider-returned empty string is falsy-but-defined
+      // and should be treated as "no id" same as null/undefined.
+      const toolCall = { id: result.id || randomUUID(), name: result.name, args: result.args };
       history.append(chatId, {
         role: "assistant", content: "", toolCall, timestamp: Date.now(),
       });
@@ -76,4 +102,9 @@ export async function runHarness(chatId: string, userMessage: string, chatFn: Ch
     history.append(chatId, { role: "assistant", content: result.content, toolCall: null, timestamp: Date.now() });
     return result.content;
   }
+
+  const fallback = "Não consegui concluir sua solicitação agora, pode tentar de novo?";
+  log.warn("tool-call loop hit MAX_TOOL_ITERATIONS", { chatId, MAX_TOOL_ITERATIONS });
+  history.append(chatId, { role: "assistant", content: fallback, toolCall: null, timestamp: Date.now() });
+  return fallback;
 }
