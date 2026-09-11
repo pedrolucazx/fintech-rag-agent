@@ -61,3 +61,53 @@ entrevista).
   não-trivial" — o runner nativo já cobre isso sem dependência nova.
 - **Alternatives considered**: Vitest/Jest — mais recursos, mas dependência
   extra injustificada para um punhado de testes `assert`-based.
+
+## LLM: adapter com NVIDIA (default) + Gemini
+
+- **Decision**: interface mínima `chat(messages, tools?)` em `src/llm.ts`,
+  com dois providers reais: NVIDIA NIM (default) e Gemini, selecionáveis
+  por `LLM_PROVIDER`. Gemini é acessado pelo mesmo SDK `openai` já em uso,
+  só trocando `baseURL` pro endpoint OpenAI-compatible do Gemini
+  (`generativelanguage.googleapis.com/v1beta/openai/`) — suporta chat
+  multi-turno e tool-calling nesse modo, então nenhuma dependência nova é
+  necessária.
+- **Rationale**: prova que o adapter troca de provider de verdade (2
+  implementações reais), sem precisar de um SDK por provider — o endpoint
+  OpenAI-compatible do Gemini existe exatamente pra esse tipo de reuso.
+- **Alternatives considered**: SDK nativo do Google (`@google/genai`) —
+  funcionaria, mas adicionaria uma dependência e um formato de mensagem
+  diferente do `openai`, exigindo um mapeamento a mais só pra ganhar
+  recursos que o endpoint compatível já cobre pro nosso caso de uso.
+
+## Embeddings: adapter com Xenova (default, local) + Voyage AI (opcional)
+
+- **Decision**: interface mínima `embed(text)` em `src/embeddings.ts`, com
+  `@xenova/transformers` como default local e Voyage AI como alternativa
+  opcional (via `VOYAGE_API_KEY`), selecionável por `EMBEDDINGS_PROVIDER`.
+  Voyage AI é chamado por `fetch` nativo direto em
+  `POST https://api.voyageai.com/v1/embeddings` — sem SDK novo, já que é um
+  REST simples.
+- **Rationale**: Xenova continua sendo o default (zero custo garantido, zero
+  rede); Voyage AI entra como segunda implementação real pra provar o
+  adapter, com free tier próprio (200M tokens de crédito único por conta).
+- **Alternatives considered**: SDK oficial `@voyage-ai/typescript-sdk` —
+  dependência extra pra uma única chamada REST que `fetch` nativo já cobre
+  (ponytail rung 3: stdlib/runtime resolve).
+
+## Cache: resposta do LLM em memória (sem Redis)
+
+- **Decision**: cache simples em `src/cache.ts` — um `Map` no processo,
+  chave = hash de `(provider, messages, tools)`, com TTL curto, usado pelo
+  `llm.ts` pra evitar rechamar o modelo com uma requisição idêntica.
+- **Rationale**: reduz consumo de free tier/token em retries e perguntas
+  repetidas dentro da mesma sessão, documentando uma preocupação real de
+  custo de token mesmo em projeto de lab — sem precisar de infraestrutura
+  externa pra isso.
+- **Alternatives considered**: Redis (ex.: Upstash free tier) — resolveria
+  cache compartilhado entre múltiplos processos/instâncias, mas o bot roda
+  como processo único local; não há "outro processo" pra compartilhar cache
+  com ele. Adicionar Redis aqui seria over-engineering (Constitution
+  Principle VII) — fica como upgrade path caso o projeto vire multi-instância
+  algum dia, o que não é o caso hoje. Nenhum banco de dados (Redis, Mongo,
+  Postgres) é usado neste lab — persistência real é escopo do projeto-âncora
+  fintech separado.

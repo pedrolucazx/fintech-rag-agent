@@ -1,15 +1,16 @@
 <!--
 Sync Impact Report
-- Version change: 1.1.0 → 1.1.1
-- Modified principles: none (clarificação de redação, sem mudança de conteúdo normativo)
-- Added sections: none
+- Version change: 1.1.1 → 1.2.0
+- Modified principles: III. Stack Zero-Custo (referência a LLM/embeddings passa a citar o adapter, não mais um único provider fixo)
+- Added principles: VII. Providers Trocáveis, Sem Registry Especulativo
 - Removed sections: none
-- Other changes: removidas referências a `docs/plano.md` (documento pessoal
-  removido do repo — não pertence a um repositório de projeto) e ao nome do
-  projeto irmão `pac-mentor`; motivos/decisões que só existiam lá agora
-  vivem inline neste documento e em `research.md`
+- Other changes: "Stack e Escopo Técnico" passa a descrever o adapter de LLM
+  (NVIDIA + Gemini) e de embeddings (Xenova + Voyage AI) com cache em
+  memória, e adiciona "nenhum banco de dados" ao explicitamente fora de
+  escopo (Redis/Mongo/Postgres pertencem ao projeto-âncora fintech, não a
+  este lab)
 - Templates requiring updates:
-  - ✅ specs/001-telegram-rag-support/ (research.md, plan.md, quickstart.md, tasks.md, checklists/requirements.md ajustados na mesma limpeza)
+  - ✅ specs/001-telegram-rag-support/ (research.md, plan.md, contracts/, tasks.md atualizados na mesma mudança)
 - Follow-up TODOs: none
 -->
 
@@ -75,18 +76,41 @@ framework de testes pesado, sem fixtures, sem suíte por função. Código trivi
 para pegar regressão em decisões (branches, loops) sem impor cerimônia de
 projeto de produção.
 
+### VII. Providers Trocáveis, Sem Registry Especulativo
+LLM e embeddings ficam atrás de uma interface mínima (`chat()`/`embed()`),
+mas só é implementado provider que tenha uso real e demonstrável no
+projeto — hoje 2 de cada (LLM: NVIDIA default + Gemini; embeddings: Xenova
+local default + Voyage AI opcional), nunca um registry/plugin system
+genérico pra providers hipotéticos ainda não usados. Cache de resposta do
+LLM fica em memória (`Map` do processo), sem serviço externo (Redis,
+Memcached) — o bot é um processo único local, sem múltiplas instâncias pra
+justificar cache compartilhado; se isso mudar, é uma nova decisão, não um
+"e se precisar" antecipado. Rationale: prova que a abstração funciona (você
+consegue trocar de provider de verdade) sem violar o Principle I — a
+diferença entre "adapter" e "over-engineering" aqui é ter implementação real
+nos dois lados, não simular flexibilidade infinita.
+
 ## Stack e Escopo Técnico
 
-Node.js + TypeScript. Telegram via `grammy`. LLM via NVIDIA NIM (endpoint
-OpenAI-compatible, key `nvapi-`). Embeddings via `@xenova/transformers`
-(local, sem custo de API). Vector store via `vectra` (arquivo local). Corpus
-inicial: regulamento público PIX/Bacen + FAQ de faturamento de uma operadora
-de telecom fictícia ("ConectaNet"), organizados em `data/docs/<fonte>/`.
-Tools mockadas (sem integração externa real): `consultar_status_fatura`,
+Node.js + TypeScript. Telegram via `grammy`. LLM atrás de um adapter
+(`src/llm.ts`): NVIDIA NIM (default, key `nvapi-`) + Gemini (via
+`GEMINI_API_KEY`, mesmo SDK `openai` apontado pro endpoint
+OpenAI-compatible do Gemini — nenhuma dependência nova), selecionável por
+`LLM_PROVIDER`. Embeddings atrás de outro adapter (`src/embeddings.ts`):
+`@xenova/transformers` (default, local, sem custo de API) + Voyage AI
+(opcional via `VOYAGE_API_KEY`, chamado por `fetch` nativo — sem SDK novo),
+selecionável por `EMBEDDINGS_PROVIDER`. Cache de resposta do LLM em memória
+(`src/cache.ts`) pra evitar chamada duplicada em requisições idênticas.
+Vector store via `vectra` (arquivo local). Corpus inicial: regulamento
+público PIX/Bacen + FAQ de faturamento de uma operadora de telecom
+fictícia ("ConectaNet"), organizados em `data/docs/<fonte>/`. Tools
+mockadas (sem integração externa real): `consultar_status_fatura`,
 `abrir_ticket`. Fora de escopo: WhatsApp (a alternativa não-oficial exige
 engenharia reversa do WhatsApp Web e corre risco de ban do número — Telegram
 Bot API é gratuita e não exige aprovação de negócio, ver `research.md`),
-qualquer framework de agente pronto, deploy hospedado.
+qualquer framework de agente pronto, deploy hospedado, qualquer banco de
+dados (Redis/Mongo/Postgres) — persistência real é escopo do projeto-âncora
+fintech separado, não deste lab.
 
 ## Persona e Domínio do Produto
 
@@ -131,4 +155,4 @@ material, PATCH para clarificação/redação. Specs e plans gerados pelo
 `/speckit-plan` devem incluir uma checagem explícita de conformidade com os
 Core Principles antes de avançar para tasks.
 
-**Version**: 1.1.1 | **Ratified**: 2026-09-10 | **Last Amended**: 2026-09-11
+**Version**: 1.2.0 | **Ratified**: 2026-09-10 | **Last Amended**: 2026-09-11

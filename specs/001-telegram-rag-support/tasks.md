@@ -31,7 +31,7 @@ na raiz do repositório.
 - [ ] T002 Inicializar projeto Node com `package.json` + `tsconfig.json` (TypeScript 5, target Node 20)
 - [ ] T003 [P] Instalar dependências de runtime: `grammy`, `openai`, `@xenova/transformers`, `vectra`
 - [ ] T004 [P] Instalar dependências de dev: `typescript`, `tsx` (execução direta de TS), `@types/node`
-- [ ] T005 [P] Criar `.env.example` com `TELEGRAM_BOT_TOKEN` e `NVIDIA_API_KEY` (documentação, sem valores reais)
+- [ ] T005 [P] Criar `.env.example` com `TELEGRAM_BOT_TOKEN` e `NVIDIA_API_KEY` (documentação, sem valores reais) — expandido em Phase 7 (T036) com as vars dos providers extras
 - [ ] T006 [P] Adicionar scripts `dev`, `ingest`, `test` ao `package.json`
 
 ---
@@ -45,7 +45,7 @@ integração Telegram↔LLM, sem RAG/tools ainda. Bloqueia todas as user stories
 
 - [ ] T007 Implementar carregamento de config/segredos (lê `TELEGRAM_BOT_TOKEN`, `NVIDIA_API_KEY` de `.env`, falha com mensagem clara se faltar) em `src/config.ts`
 - [ ] T008 [P] Implementar logger estruturado leve (sem dependência nova — `console` com prefixo/nível) em `src/logger.ts`
-- [ ] T009 [P] Implementar client do LLM (NVIDIA NIM via SDK `openai`, timeout + 1 retry simples em erro transitório) em `src/llm.ts`
+- [ ] T009 [P] Implementar client do LLM (NVIDIA NIM via SDK `openai`, timeout + 1 retry simples em erro transitório) em `src/llm.ts` — vira adapter multi-provider na Phase 7 (T037), implementar T009 já com a assinatura `chat(messages, tools)` de contracts/providers.md pra não retrabalhar
 - [ ] T010 [P] Implementar histórico de conversa em memória, chaveado por `chatId` (`ConversationTurn[]` — ver data-model.md) em `src/history.ts`
 - [ ] T011 Implementar o loop do harness (`src/harness.ts`): monta mensagens (system + histórico), chama `llm.ts`, decide entre `tool_call` e resposta final, repete até resposta final — SEM tools/RAG registrados ainda (registro vazio, extensível nas fases seguintes)
 - [ ] T012 Implementar `src/bot.ts`: setup do `grammy` em long polling, roteia cada mensagem recebida para `harness.ts` e responde com o texto final (depende de T007, T010, T011)
@@ -74,8 +74,8 @@ cruza as duas fontes, e pergunta fora do corpus — ver `quickstart.md` → US1.
 ### Implementation for User Story 1
 
 - [x] T015 [P] [US1] Popular `data/docs/regulamentacao-pix/` (regulamento PIX real — tipos de chave, limites, devolução/MED) e `data/docs/faturamento-conectanet/` (FAQ fictício de faturamento: 2ª via, formas de pagamento PIX/boleto/cartão/débito automático, prazos) com conteúdo real, não placeholder
-- [ ] T016 [US1] Implementar `scripts/ingest.ts`: lê `data/docs/**`, faz chunking, gera embeddings via `@xenova/transformers`, popula índice `vectra` em `data/index/` com metadado `source`/`path` (data-model.md → DocumentChunk)
-- [ ] T017 [US1] Implementar `retrieve(query, topK?)` em `src/rag.ts` per contracts/retrieval.md (carrega índice `vectra`, embeda a query, retorna `RetrievedChunk[]` com `source`+`score`, filtra por limiar mínimo)
+- [ ] T016 [US1] Implementar `scripts/ingest.ts`: lê `data/docs/**`, faz chunking, gera embeddings via `@xenova/transformers`, popula índice `vectra` em `data/index/` com metadado `source`/`path` (data-model.md → DocumentChunk) — chama diretamente o Xenova por enquanto; passa a usar `embeddings.ts` na Phase 7 (T038)
+- [ ] T017 [US1] Implementar `retrieve(query, topK?)` em `src/rag.ts` per contracts/retrieval.md (carrega índice `vectra`, embeda a query, retorna `RetrievedChunk[]` com `source`+`score`, filtra por limiar mínimo) — idem T016, migra pro adapter em T038
 - [ ] T018 [US1] Integrar RAG ao harness: em `src/harness.ts`, injetar os `RetrievedChunk[]` recuperados no contexto antes de chamar o LLM; system prompt instrui a responder só com base no contexto e dizer que não sabe se a lista vier vazia (FR-003)
 - [ ] T019 [US1] Validação manual: rodar os 3 cenários de `quickstart.md` → US1
 
@@ -208,3 +208,34 @@ Task: "Popular data/docs/regulamentacao-pix|faturamento-conectanet (T015)"
 - Cada user story é completável e testável de forma independente
 - Commitar após cada task ou grupo lógico de tasks
 - Parar em qualquer checkpoint acima já entrega algo demonstrável
+
+---
+
+## Phase 7: Convergence — Providers Trocáveis e Cache
+
+**Motivo**: escopo evoluído após a geração inicial das tasks (Constitution
+v1.2.0, Principle VII) — LLM e embeddings passam a ficar atrás de um
+adapter com 2 providers reais cada, mais um cache de resposta em memória.
+Numeração append-only (T035+), sem renumerar T001-T034, seguindo a
+convenção do próprio spec-kit (`/speckit-converge`) pra evolução de escopo
+depois da geração inicial de tasks. Conceitualmente pertence à Foundational
+(Phase 2) — ver notas em T009/T016/T017 apontando pra cá.
+
+- [ ] T035 [P] Implementar cache genérico em memória (`getOrSet(key, ttlMs, fn)`, `Map` + TTL) em `src/cache.ts`
+- [ ] T036 [P] Expandir `.env.example` (T005) com `LLM_PROVIDER`, `GEMINI_API_KEY`, `EMBEDDINGS_PROVIDER`, `VOYAGE_API_KEY` (todas opcionais, default pra NVIDIA/Xenova)
+- [ ] T037 Refatorar `src/llm.ts` pra adapter: `chat(messages, tools)` seleciona NVIDIA ou Gemini via `LLM_PROVIDER` (mesmo SDK `openai`, só troca `baseURL`/`apiKey`/`model` — ver contracts/providers.md), passando toda chamada por `cache.ts` (T035) antes de ir pra rede (depende de T035)
+- [ ] T038 Criar `src/embeddings.ts`: `embed(text)` seleciona Xenova (default) ou Voyage AI via `EMBEDDINGS_PROVIDER` (Voyage por `fetch` nativo em `api.voyageai.com/v1/embeddings`); atualizar `scripts/ingest.ts` (T016) e `src/rag.ts` (T017) pra chamarem esse módulo em vez de usar Xenova direto
+- [ ] T039 [P] Teste mínimo do cache em `src/cache.test.ts`: mesma chave dentro do TTL não rechama `fn`; chave diferente chama; chave expirada rechama (depende de T035)
+- [ ] T040 [P] Teste mínimo da seleção de provider em `src/llm.test.ts` (ou ampliar `harness.test.ts`): `LLM_PROVIDER=nvidia` monta client com a config da NVIDIA, `LLM_PROVIDER=gemini` monta com a do Gemini — sem chamada de rede real (depende de T037)
+- [ ] T041 Validação manual: rodar o bot com `LLM_PROVIDER=gemini` (chave própria) e repetir 1 cenário de cada user story (US1/US2/US3) — confirma que a troca de provider funciona de verdade, não só no papel (depende de T037, T038)
+
+**Checkpoint**: LLM e embeddings trocáveis por variável de ambiente, com
+cache reduzindo chamadas repetidas — sem nenhuma dependência nova além das
+4 já instaladas, sem banco de dados.
+
+### Dependências da Phase 7
+
+- T035 bloqueia T037, T039
+- T037 bloqueia T040, T041
+- T038 bloqueia T041
+- T036 é independente (só documentação de env vars)

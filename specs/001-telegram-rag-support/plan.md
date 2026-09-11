@@ -21,8 +21,13 @@ gratuitos.
 **Language/Version**: Node.js 20+ / TypeScript 5
 
 **Primary Dependencies**: `grammy` (Telegram Bot API), `openai` SDK apontado
-para o endpoint OpenAI-compatible da NVIDIA NIM, `@xenova/transformers`
-(embeddings locais), `vectra` (vector store local em arquivo)
+para o endpoint OpenAI-compatible da NVIDIA NIM (default) ou do Gemini
+(`LLM_PROVIDER=gemini`), `@xenova/transformers` (embeddings locais,
+default) com Voyage AI como alternativa via `fetch` nativo
+(`EMBEDDINGS_PROVIDER=voyage`), `vectra` (vector store local em arquivo).
+Nenhuma dependência nova em relação à primeira versão do plano — os 2
+providers extras (Gemini, Voyage AI) reaproveitam o SDK `openai` já
+instalado e `fetch` nativo, respectivamente.
 
 **Storage**: Arquivos locais — índice do `vectra` (embeddings dos chunks de
 documentação) e `data/tickets.json` (chamados simulados, gerado em runtime,
@@ -58,7 +63,8 @@ simultâneos
 | III. Stack zero-custo | PASS — todas as dependências (NVIDIA free tier, embeddings locais, vector store local, Telegram Bot API) são gratuitas |
 | IV. RAG multi-fonte com proveniência | PASS — ver Data Model: chunk carrega `source` |
 | V. Qualidade prod-relevante só onde importa | PASS — segredos via `.env`, erro/timeout/retry nas chamadas ao LLM e tools, logging leve; sem Docker/CI/deploy (fora de escopo) |
-| VI. Teste mínimo para lógica não-trivial | PASS — `node:test` colocado com `rag.ts`, `harness.ts`, `tools.ts` |
+| VI. Teste mínimo para lógica não-trivial | PASS — `node:test` colocado com `rag.ts`, `harness.ts`, `tools.ts`, `cache.ts` |
+| VII. Providers trocáveis, sem registry especulativo | PASS — `llm.ts`/`embeddings.ts` têm 2 implementações reais cada (NVIDIA+Gemini, Xenova+Voyage), sem plugin system genérico; cache em memória, sem Redis/Mongo/Postgres |
 
 Nenhuma violação — Complexity Tracking não se aplica.
 
@@ -80,14 +86,16 @@ specs/001-telegram-rag-support/
 
 ```text
 src/
-├── bot.ts          # setup do grammy, long polling, roteamento de mensagem → harness
-├── harness.ts       # o loop do agente: monta contexto → chama LLM → decide RAG/tool/resposta → repete
-├── harness.test.ts   # teste mínimo do loop de decisão (mock de LLM)
-├── rag.ts            # chunking, embedding (xenova) e retrieval (vectra) com metadado de fonte
-├── rag.test.ts        # teste mínimo de retrieval (pergunta conhecida → chunk esperado)
-├── tools.ts           # schema + execução de consultar_status_transacao e abrir_ticket
-├── tools.test.ts       # teste mínimo de cada tool mockada
-└── llm.ts             # client NVIDIA NIM (SDK openai apontado pro endpoint da NVIDIA)
+├── bot.ts             # setup do grammy, long polling, roteamento de mensagem → harness
+├── harness.ts          # o loop do agente: monta contexto → chama LLM → decide RAG/tool/resposta → repete
+├── harness.test.ts      # teste mínimo do loop de decisão (mock de LLM)
+├── rag.ts               # chunking e retrieval (vectra) com metadado de fonte, usa embeddings.ts
+├── rag.test.ts           # teste mínimo de retrieval (pergunta conhecida → chunk esperado)
+├── tools.ts              # schema + execução de consultar_status_fatura e abrir_ticket
+├── tools.test.ts          # teste mínimo de cada tool mockada
+├── llm.ts                 # adapter de LLM: NVIDIA (default) + Gemini, via cache.ts
+├── embeddings.ts           # adapter de embeddings: Xenova (default) + Voyage AI
+└── cache.ts                # cache de resposta do LLM em memória (Map + TTL)
 
 data/
 ├── docs/
@@ -101,11 +109,13 @@ scripts/
 ```
 
 **Structure Decision**: Projeto único (sem frontend/mobile), estrutura plana
-em `src/` — 4 módulos funcionais + entrypoint do bot, testes colocados junto
+em `src/` — módulos funcionais + entrypoint do bot, testes colocados junto
 ao módulo que testam (evita árvore `tests/` paralela para um projeto deste
-tamanho). Corpus e índice ficam fora de `src/` em `data/`, com um script de
-ingest separado do runtime do bot (ingestão é um passo offline, não parte do
-loop do harness).
+tamanho). `llm.ts` e `embeddings.ts` são adapters de provider (Constitution
+Principle VII) — `rag.ts` e `scripts/ingest.ts` chamam `embeddings.ts`, não
+implementam embedding diretamente. Corpus e índice ficam fora de `src/` em
+`data/`, com um script de ingest separado do runtime do bot (ingestão é um
+passo offline, não parte do loop do harness).
 
 ## Complexity Tracking
 
