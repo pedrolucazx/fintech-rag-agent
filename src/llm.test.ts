@@ -45,3 +45,16 @@ describe("llm.ts — provider selection (no network calls)", () => {
     assert.strictEqual(config.voyageApiKey, "test-voyage-key");
   });
 });
+
+test("NVIDIA model has a supported default and accepts an environment override", async (t) => {
+  const { config } = await import("./config.js");
+  const previous = process.env.NVIDIA_MODEL;
+  t.after(() => {
+    if (previous === undefined) delete process.env.NVIDIA_MODEL;
+    else process.env.NVIDIA_MODEL = previous;
+  });
+  delete process.env.NVIDIA_MODEL;
+  assert.strictEqual(config.nvidiaModel, "nvidia/nemotron-3-super-120b-a12b");
+  process.env.NVIDIA_MODEL = "custom-model";
+  assert.strictEqual(config.nvidiaModel, "custom-model");
+});

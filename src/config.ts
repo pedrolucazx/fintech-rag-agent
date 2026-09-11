@@ -23,6 +23,9 @@ export const config = {
   get nvidiaApiKey() {
     return required("NVIDIA_API_KEY");
   },
+  get nvidiaModel() {
+    return optional("NVIDIA_MODEL", "nvidia/nemotron-3-super-120b-a12b");
+  },
   get llmProvider() {
     return optional("LLM_PROVIDER", "nvidia");
   },

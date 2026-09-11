@@ -14,7 +14,6 @@ export type ChatResult =
   | { type: "tool_call"; id?: string; name: string; args: Record<string, unknown> }
   | { type: "text"; content: string };
 
-const NVIDIA_MODEL = "meta/llama-3.1-8b-instruct";
 const GEMINI_MODEL = "gemini-1.5-flash";
 const TIMEOUT_MS = 15_000;
 const CACHE_TTL_MS = 5 * 60 * 1000;
@@ -50,7 +49,7 @@ function getClient(): OpenAI {
 }
 
 function getModel(): string {
-  return config.llmProvider === "gemini" ? GEMINI_MODEL : NVIDIA_MODEL;
+  return config.llmProvider === "gemini" ? GEMINI_MODEL : config.nvidiaModel;
 }
 
 function toOpenAiTool(tool: ToolSchema) {
@@ -70,7 +69,7 @@ function toOpenAiTool(tool: ToolSchema) {
 // Revisit if per-user isolation is ever added for real.
 function buildCacheKey(messages: ChatMessage[], tools: ToolSchema[]): string {
   const provider = config.llmProvider;
-  const payload = JSON.stringify({ provider, messages, tools });
+  const payload = JSON.stringify({ provider, model: getModel(), messages, tools });
   return `llm:${provider}:${payload}`;
 }
 
