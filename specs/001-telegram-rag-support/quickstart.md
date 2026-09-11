@@ -11,13 +11,13 @@ peça.
   token salvo em `.env` (`TELEGRAM_BOT_TOKEN`)
 - Chave da NVIDIA NIM em `.env` (`NVIDIA_API_KEY`) — obtida em
   [build.nvidia.com](https://build.nvidia.com)
-- Pelo menos um documento em `data/docs/pix-bacen/` e em
+- Pelo menos um documento em `data/docs/regulamentacao-pix/` e em
   `data/docs/faturamento-conectanet/`
 
 ## Setup
 
 1. `npm install`
-2. Popular `data/docs/pix-bacen/` (regulamento PIX/Bacen) e
+2. Popular `data/docs/regulamentacao-pix/` (regulamento PIX/Bacen) e
    `data/docs/faturamento-conectanet/` (FAQ de faturamento: 2ª via, formas
    de pagamento, prazos)
 3. `npm run ingest` — roda `scripts/ingest.ts`, gera o índice em `data/index/`

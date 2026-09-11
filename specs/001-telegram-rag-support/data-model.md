@@ -11,7 +11,7 @@ Representa um fragmento indexado de uma fonte de documentação.
 | Campo | Tipo | Descrição |
 |---|---|---|
 | `id` | string | Identificador único do chunk |
-| `source` | string | Fonte de origem (`pix-bacen`, `faturamento-conectanet`, ...) — obrigatório, sustenta FR-002 |
+| `source` | string | Fonte de origem (`regulamentacao-pix`, `faturamento-conectanet`, ...) — obrigatório, sustenta FR-002 |
 | `path` | string | Caminho do arquivo original em `data/docs/<source>/` |
 | `text` | string | Conteúdo textual do fragmento |
 | `embedding` | number[] | Vetor de embedding do `text`, gerado por `@xenova/transformers` |

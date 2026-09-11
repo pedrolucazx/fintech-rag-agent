@@ -27,7 +27,7 @@ na raiz do repositório.
 
 **Purpose**: inicialização do projeto Node/TS
 
-- [ ] T001 Criar estrutura de diretórios per plan.md: `src/`, `data/docs/pix-bacen/`, `data/docs/faturamento-conectanet/`, `data/index/`, `scripts/`
+- [ ] T001 Criar estrutura de diretórios per plan.md: `src/`, `data/docs/regulamentacao-pix/`, `data/docs/faturamento-conectanet/`, `data/index/`, `scripts/`
 - [ ] T002 Inicializar projeto Node com `package.json` + `tsconfig.json` (TypeScript 5, target Node 20)
 - [ ] T003 [P] Instalar dependências de runtime: `grammy`, `openai`, `@xenova/transformers`, `vectra`
 - [ ] T004 [P] Instalar dependências de dev: `typescript`, `tsx` (execução direta de TS), `@types/node`
@@ -73,7 +73,7 @@ cruza as duas fontes, e pergunta fora do corpus — ver `quickstart.md` → US1.
 
 ### Implementation for User Story 1
 
-- [x] T015 [P] [US1] Popular `data/docs/pix-bacen/` (regulamento PIX real — tipos de chave, limites, devolução/MED) e `data/docs/faturamento-conectanet/` (FAQ fictício de faturamento: 2ª via, formas de pagamento PIX/boleto/cartão/débito automático, prazos) com conteúdo real, não placeholder
+- [x] T015 [P] [US1] Popular `data/docs/regulamentacao-pix/` (regulamento PIX real — tipos de chave, limites, devolução/MED) e `data/docs/faturamento-conectanet/` (FAQ fictício de faturamento: 2ª via, formas de pagamento PIX/boleto/cartão/débito automático, prazos) com conteúdo real, não placeholder
 - [ ] T016 [US1] Implementar `scripts/ingest.ts`: lê `data/docs/**`, faz chunking, gera embeddings via `@xenova/transformers`, popula índice `vectra` em `data/index/` com metadado `source`/`path` (data-model.md → DocumentChunk)
 - [ ] T017 [US1] Implementar `retrieve(query, topK?)` em `src/rag.ts` per contracts/retrieval.md (carrega índice `vectra`, embeda a query, retorna `RetrievedChunk[]` com `source`+`score`, filtra por limiar mínimo)
 - [ ] T018 [US1] Integrar RAG ao harness: em `src/harness.ts`, injetar os `RetrievedChunk[]` recuperados no contexto antes de chamar o LLM; system prompt instrui a responder só com base no contexto e dizer que não sabe se a lista vier vazia (FR-003)
@@ -177,7 +177,7 @@ multi-turno.
 ```bash
 # Em paralelo, arquivos diferentes:
 Task: "Teste de retrieval em src/rag.test.ts (T014)"
-Task: "Popular data/docs/pix-bacen|faturamento-conectanet (T015)"
+Task: "Popular data/docs/regulamentacao-pix|faturamento-conectanet (T015)"
 ```
 
 ---

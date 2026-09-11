@@ -91,7 +91,7 @@ src/
 
 data/
 ├── docs/
-│   ├── pix-bacen/            # regulamento PIX/Bacen (.md)
+│   ├── regulamentacao-pix/            # regulamento PIX/Bacen (.md)
 │   └── faturamento-conectanet/  # FAQ de faturamento da operadora fictícia (.md)
 ├── index/               # índice gerado pelo vectra (gitignored, reconstruível via script de ingest)
 └── tickets.json         # chamados simulados (gitignored, gerado em runtime)
