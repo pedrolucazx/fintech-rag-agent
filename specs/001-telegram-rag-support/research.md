@@ -94,20 +94,29 @@ entrevista).
   dependência extra pra uma única chamada REST que `fetch` nativo já cobre
   (ponytail rung 3: stdlib/runtime resolve).
 
-## Cache: resposta do LLM em memória (sem Redis)
+## Cache: resposta do LLM via Redis (Docker local)
 
-- **Decision**: cache simples em `src/cache.ts` — um `Map` no processo,
-  chave = hash de `(provider, messages, tools)`, com TTL curto, usado pelo
-  `llm.ts` pra evitar rechamar o modelo com uma requisição idêntica.
-- **Rationale**: reduz consumo de free tier/token em retries e perguntas
-  repetidas dentro da mesma sessão, documentando uma preocupação real de
-  custo de token mesmo em projeto de lab — sem precisar de infraestrutura
-  externa pra isso.
-- **Alternatives considered**: Redis (ex.: Upstash free tier) — resolveria
-  cache compartilhado entre múltiplos processos/instâncias, mas o bot roda
-  como processo único local; não há "outro processo" pra compartilhar cache
-  com ele. Adicionar Redis aqui seria over-engineering (Constitution
-  Principle VII) — fica como upgrade path caso o projeto vire multi-instância
-  algum dia, o que não é o caso hoje. Nenhum banco de dados (Redis, Mongo,
-  Postgres) é usado neste lab — persistência real é escopo do projeto-âncora
-  fintech separado.
+- **Decision** *(revisado — ver histórico abaixo)*: cache em `src/cache.ts`
+  usando Redis (`ioredis`), chave = hash de `(provider, messages, tools)`,
+  TTL nativo do Redis (`SET ... PX ttlMs`), subido via `docker-compose.yml`
+  com um único serviço `redis:alpine`.
+- **Rationale**: além de reduzir chamadas repetidas ao LLM (custo de token),
+  é uma peça de arquitetura deliberadamente realista — cache-aside com
+  Redis é um padrão citado explicitamente como gap no prep de entrevista do
+  usuário (Redis "não usei em produção, mas entendo o conceito") — ter isso
+  rodando de verdade neste lab fecha esse gap com evidência, não só teoria.
+  Continua zero-custo (Redis local via Docker, sem serviço hospedado).
+- **Decisão original (revertida)**: a primeira versão usava um `Map` em
+  memória, rejeitando Redis por não haver múltiplos processos pra
+  justificar cache compartilhado (ver Constitution Principle VII). O
+  usuário reconsiderou: o valor de Redis aqui não é resolver um problema de
+  escala que o projeto não tem, é praticar arquitetura/custo de propósito
+  (tema do curso Full Cycle: "o dev também é arquiteto"). Mantido **contido**
+  — só o cache passa por Redis; histórico de conversa, faturas e tickets
+  continuam sem banco (ver Assumptions em `spec.md`).
+- **Alternatives considered**: manter `Map` em memória — mais simples, mas
+  perde a chance de demonstrar Redis de verdade. LocalStack/floci.io (usado
+  no projeto-âncora fintech do usuário) — descartado aqui: essas ferramentas
+  emulam serviços AWS (S3, Lambda, DynamoDB), Redis não precisa dessa
+  camada, é só subir o container direto; misturar essa infra aqui diluiria
+  a identidade dos dois projetos (ver `docs` do projeto-âncora).

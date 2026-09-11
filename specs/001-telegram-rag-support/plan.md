@@ -24,20 +24,24 @@ gratuitos.
 para o endpoint OpenAI-compatible da NVIDIA NIM (default) ou do Gemini
 (`LLM_PROVIDER=gemini`), `@xenova/transformers` (embeddings locais,
 default) com Voyage AI como alternativa via `fetch` nativo
-(`EMBEDDINGS_PROVIDER=voyage`), `vectra` (vector store local em arquivo).
-Nenhuma dependência nova em relação à primeira versão do plano — os 2
-providers extras (Gemini, Voyage AI) reaproveitam o SDK `openai` já
-instalado e `fetch` nativo, respectivamente.
+(`EMBEDDINGS_PROVIDER=voyage`), `vectra` (vector store local em arquivo),
+`ioredis` (client Redis pro cache). Os providers extras (Gemini, Voyage AI)
+reaproveitam o SDK `openai` já instalado e `fetch` nativo — `ioredis` é a
+única dependência nova desta rodada.
 
 **Storage**: Arquivos locais — índice do `vectra` (embeddings dos chunks de
 documentação) e `data/tickets.json` (chamados simulados, gerado em runtime,
-fora do controle de versão). Sem banco de dados hospedado.
+fora do controle de versão). Redis local (via Docker) só pro cache de
+resposta do LLM. Sem banco de dados hospedado, sem Mongo/Postgres.
 
 **Testing**: `node:test` + `node:assert` (nativo do Node, sem framework
-externo), um arquivo de teste mínimo por módulo com lógica não-trivial
+externo), um arquivo de teste mínimo por módulo com lógica não-trivial;
+`cache.test.ts` roda contra um Redis real local (`docker compose up -d`
+antes de `npm test`)
 
 **Target Platform**: Máquina local (Linux), processo Node de longa duração
-via long polling do Telegram — sem deploy hospedado
+via long polling do Telegram + 1 container Docker (Redis) — sem deploy
+hospedado
 
 **Project Type**: Serviço único (processo Node/bot), sem frontend
 
@@ -64,7 +68,7 @@ simultâneos
 | IV. RAG multi-fonte com proveniência | PASS — ver Data Model: chunk carrega `source` |
 | V. Qualidade prod-relevante só onde importa | PASS — segredos via `.env`, erro/timeout/retry nas chamadas ao LLM e tools, logging leve; sem Docker/CI/deploy (fora de escopo) |
 | VI. Teste mínimo para lógica não-trivial | PASS — `node:test` colocado com `rag.ts`, `harness.ts`, `tools.ts`, `cache.ts` |
-| VII. Providers trocáveis, sem registry especulativo | PASS — `llm.ts`/`embeddings.ts` têm 2 implementações reais cada (NVIDIA+Gemini, Xenova+Voyage), sem plugin system genérico; cache em memória, sem Redis/Mongo/Postgres |
+| VII. Providers trocáveis, sem registry especulativo | PASS — `llm.ts`/`embeddings.ts` têm 2 implementações reais cada (NVIDIA+Gemini, Xenova+Voyage), sem plugin system genérico; cache via Redis contido a essa única finalidade, sem Mongo/Postgres/LocalStack |
 
 Nenhuma violação — Complexity Tracking não se aplica.
 
@@ -95,7 +99,7 @@ src/
 ├── tools.test.ts          # teste mínimo de cada tool mockada
 ├── llm.ts                 # adapter de LLM: NVIDIA (default) + Gemini, via cache.ts
 ├── embeddings.ts           # adapter de embeddings: Xenova (default) + Voyage AI
-└── cache.ts                # cache de resposta do LLM em memória (Map + TTL)
+└── cache.ts                # cache de resposta do LLM via Redis (ioredis, TTL nativo)
 
 data/
 ├── docs/
@@ -106,6 +110,8 @@ data/
 
 scripts/
 └── ingest.ts            # script que lê data/docs/**, faz chunk+embed e popula data/index/
+
+docker-compose.yml        # 1 serviço: redis:alpine, só pro cache (Constitution Principle V/VII)
 ```
 
 **Structure Decision**: Projeto único (sem frontend/mobile), estrutura plana

@@ -214,27 +214,35 @@ Task: "Popular data/docs/regulamentacao-pix|faturamento-conectanet (T015)"
 ## Phase 7: Convergence — Providers Trocáveis e Cache
 
 **Motivo**: escopo evoluído após a geração inicial das tasks (Constitution
-v1.2.0, Principle VII) — LLM e embeddings passam a ficar atrás de um
-adapter com 2 providers reais cada, mais um cache de resposta em memória.
-Numeração append-only (T035+), sem renumerar T001-T034, seguindo a
-convenção do próprio spec-kit (`/speckit-converge`) pra evolução de escopo
-depois da geração inicial de tasks. Conceitualmente pertence à Foundational
-(Phase 2) — ver notas em T009/T016/T017 apontando pra cá.
+v1.3.0, Principles V e VII) — LLM e embeddings passam a ficar atrás de um
+adapter com 2 providers reais cada, mais um cache de resposta via Redis
+local (Docker) — revisão de uma decisão anterior (Map em memória, sem
+Docker) reconsiderada porque Redis fecha um gap real de entrevista e serve
+como prática de arquitetura/custo deliberada, mantendo escopo contido (só
+o cache, nada do resto da infra do projeto-âncora fintech migra pra cá; ver
+`research.md` pro histórico completo da decisão). Numeração append-only
+(T035+), sem renumerar T001-T034, seguindo a convenção do próprio spec-kit
+(`/speckit-converge`) pra evolução de escopo depois da geração inicial de
+tasks. Conceitualmente pertence à Foundational (Phase 2) — ver notas em
+T009/T016/T017 apontando pra cá.
 
-- [ ] T035 [P] Implementar cache genérico em memória (`getOrSet(key, ttlMs, fn)`, `Map` + TTL) em `src/cache.ts`
-- [ ] T036 [P] Expandir `.env.example` (T005) com `LLM_PROVIDER`, `GEMINI_API_KEY`, `EMBEDDINGS_PROVIDER`, `VOYAGE_API_KEY` (todas opcionais, default pra NVIDIA/Xenova)
+- [ ] T035 Implementar cache genérico via Redis (`getOrSet(key, ttlMs, fn)`, client `ioredis`, TTL nativo `SET ... PX`) em `src/cache.ts` (depende de T042, T043)
+- [ ] T036 [P] Expandir `.env.example` (T005) com `LLM_PROVIDER`, `GEMINI_API_KEY`, `EMBEDDINGS_PROVIDER`, `VOYAGE_API_KEY` (todas opcionais, default pra NVIDIA/Xenova; Redis usa `redis://localhost:6379` fixo, sem env var — sempre local via `docker-compose.yml`, não precisa ser configurável)
 - [ ] T037 Refatorar `src/llm.ts` pra adapter: `chat(messages, tools)` seleciona NVIDIA ou Gemini via `LLM_PROVIDER` (mesmo SDK `openai`, só troca `baseURL`/`apiKey`/`model` — ver contracts/providers.md), passando toda chamada por `cache.ts` (T035) antes de ir pra rede (depende de T035)
 - [ ] T038 Criar `src/embeddings.ts`: `embed(text)` seleciona Xenova (default) ou Voyage AI via `EMBEDDINGS_PROVIDER` (Voyage por `fetch` nativo em `api.voyageai.com/v1/embeddings`); atualizar `scripts/ingest.ts` (T016) e `src/rag.ts` (T017) pra chamarem esse módulo em vez de usar Xenova direto
-- [ ] T039 [P] Teste mínimo do cache em `src/cache.test.ts`: mesma chave dentro do TTL não rechama `fn`; chave diferente chama; chave expirada rechama (depende de T035)
+- [ ] T039 Teste mínimo do cache em `src/cache.test.ts`, rodando contra o Redis real do `docker-compose.yml` (requer `docker compose up -d` antes de `npm test`): mesma chave dentro do TTL não rechama `fn`; chave diferente chama; chave expirada rechama (depende de T035)
 - [ ] T040 [P] Teste mínimo da seleção de provider em `src/llm.test.ts` (ou ampliar `harness.test.ts`): `LLM_PROVIDER=nvidia` monta client com a config da NVIDIA, `LLM_PROVIDER=gemini` monta com a do Gemini — sem chamada de rede real (depende de T037)
 - [ ] T041 Validação manual: rodar o bot com `LLM_PROVIDER=gemini` (chave própria) e repetir 1 cenário de cada user story (US1/US2/US3) — confirma que a troca de provider funciona de verdade, não só no papel (depende de T037, T038)
+- [ ] T042 [P] Criar `docker-compose.yml` na raiz com 1 serviço: `redis:alpine`, porta padrão `6379` exposta (Constitution Principle V — único serviço Docker permitido neste lab)
+- [ ] T043 [P] Instalar `ioredis` como dependência de runtime (única dependência nova desta fase)
 
 **Checkpoint**: LLM e embeddings trocáveis por variável de ambiente, com
-cache reduzindo chamadas repetidas — sem nenhuma dependência nova além das
-4 já instaladas, sem banco de dados.
+cache via Redis local (Docker) reduzindo chamadas repetidas — Redis contido
+só ao cache, sem nenhum outro banco/serviço de infra no projeto.
 
 ### Dependências da Phase 7
 
+- T042, T043 bloqueiam T035
 - T035 bloqueia T037, T039
 - T037 bloqueia T040, T041
 - T038 bloqueia T041

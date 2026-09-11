@@ -7,21 +7,26 @@ peça.
 ## Pré-requisitos
 
 - Node.js 20+
+- Docker (só pra subir o Redis do cache — único uso de Docker neste projeto)
 - Um bot criado no Telegram via [@BotFather](https://t.me/BotFather), com o
   token salvo em `.env` (`TELEGRAM_BOT_TOKEN`)
 - Chave da NVIDIA NIM em `.env` (`NVIDIA_API_KEY`) — obtida em
   [build.nvidia.com](https://build.nvidia.com)
 - Pelo menos um documento em `data/docs/regulamentacao-pix/` e em
   `data/docs/faturamento-conectanet/`
+- Opcional: `GEMINI_API_KEY` (pra rodar com `LLM_PROVIDER=gemini`) e
+  `VOYAGE_API_KEY` (pra rodar com `EMBEDDINGS_PROVIDER=voyage`) — sem elas,
+  o bot usa NVIDIA + Xenova (defaults)
 
 ## Setup
 
 1. `npm install`
-2. Popular `data/docs/regulamentacao-pix/` (regulamento PIX/Bacen) e
+2. `docker compose up -d` — sobe o Redis do cache
+3. Popular `data/docs/regulamentacao-pix/` (regulamento PIX/Bacen) e
    `data/docs/faturamento-conectanet/` (FAQ de faturamento: 2ª via, formas
    de pagamento, prazos)
-3. `npm run ingest` — roda `scripts/ingest.ts`, gera o índice em `data/index/`
-4. `npm run dev` — inicia `src/bot.ts` em long polling
+4. `npm run ingest` — roda `scripts/ingest.ts`, gera o índice em `data/index/`
+5. `npm run dev` — inicia `src/bot.ts` em long polling
 
 ## Cenários de validação (um por User Story)
 
@@ -63,6 +68,9 @@ peça.
 
 ## Verificação automatizada
 
+- `docker compose up -d` (se ainda não estiver rodando) antes de `npm test`
+  — `cache.test.ts` roda contra o Redis real
 - `npm test` roda os testes `node:test` colocados em `src/*.test.ts`
-  (`rag.test.ts`, `harness.test.ts`, `tools.test.ts`) — cobre a lógica de
-  decisão do harness e o retrieval, não substitui os cenários manuais acima.
+  (`rag.test.ts`, `harness.test.ts`, `tools.test.ts`, `cache.test.ts`,
+  `llm.test.ts`) — cobre a lógica de decisão do harness, o retrieval, o
+  cache e a seleção de provider; não substitui os cenários manuais acima.

@@ -1,14 +1,18 @@
 <!--
 Sync Impact Report
-- Version change: 1.1.1 → 1.2.0
-- Modified principles: III. Stack Zero-Custo (referência a LLM/embeddings passa a citar o adapter, não mais um único provider fixo)
-- Added principles: VII. Providers Trocáveis, Sem Registry Especulativo
+- Version change: 1.2.0 → 1.3.0
+- Modified principles: V. Qualidade "Prod-Relevante" Só Onde Importa (Docker
+  passa a ser permitido, mas só pro serviço de cache Redis); VII. Providers
+  Trocáveis, Sem Registry Especulativo (cache muda de Map em memória pra
+  Redis via Docker — decisão revisada após reconsideração do usuário: Redis
+  fecha um gap real de entrevista dele e é uma aproximação de arquitetura
+  deliberada, não uma necessidade técnica do processo único; explicitamente
+  NÃO abre a porta pra misturar infra do projeto-âncora fintech aqui — sem
+  LocalStack/floci.io, sem Mongo/Postgres, sem outros serviços Docker)
+- Added principles: none
 - Removed sections: none
-- Other changes: "Stack e Escopo Técnico" passa a descrever o adapter de LLM
-  (NVIDIA + Gemini) e de embeddings (Xenova + Voyage AI) com cache em
-  memória, e adiciona "nenhum banco de dados" ao explicitamente fora de
-  escopo (Redis/Mongo/Postgres pertencem ao projeto-âncora fintech, não a
-  este lab)
+- Other changes: "Stack e Escopo Técnico" atualizado (Redis/ioredis/
+  docker-compose no lugar do Map em memória)
 - Templates requiring updates:
   - ✅ specs/001-telegram-rag-support/ (research.md, plan.md, contracts/, tasks.md atualizados na mesma mudança)
 - Follow-up TODOs: none
@@ -60,12 +64,16 @@ documento — sem isso, "multi-fonte" vira só uma pasta com PDFs soltos.
 Aplicar rigor de produção apenas nos pontos que realmente importam: segredos
 via variáveis de ambiente (nunca hardcoded), tratamento de erro/timeout/retry
 simples nas chamadas ao LLM e na execução de tools, logging estruturado leve.
-Docker, CI/CD, deploy hospedado, observabilidade externa (Grafana/Datadog) e
-qualquer forma de multi-tenancy estão FORA de escopo — isso pertence a outro
-projeto (infraestrutura "de verdade" é tratada no projeto-âncora fintech
-separado). Rationale: "próximo de prod" aqui significa não escrever código
-descartável nos pontos que um recrutador vai perguntar sobre, não replicar um
-ambiente de produção real.
+Docker é permitido apenas pro serviço de cache (Redis, ver Principle VII) —
+um único `docker-compose.yml`, um único serviço. CI/CD, deploy hospedado,
+observabilidade externa (Grafana/Datadog), qualquer forma de multi-tenancy e
+qualquer outro serviço via Docker/LocalStack/floci.io continuam FORA de
+escopo — isso pertence a outro projeto (infraestrutura "de verdade" é
+tratada no projeto-âncora fintech separado, que já usa LocalStack/floci
+pra emulação AWS). Rationale: "próximo de prod" aqui significa não escrever
+código descartável nos pontos que um recrutador vai perguntar sobre (ex.:
+cache-aside com Redis, um gap real do candidato), não replicar um ambiente
+de produção completo nem duplicar a proposta do projeto-âncora.
 
 ### VI. Teste Mínimo para Lógica Não-Trivial
 Toda lógica não-trivial (chunking/retrieval, o loop do harness, parsing de
@@ -81,14 +89,21 @@ LLM e embeddings ficam atrás de uma interface mínima (`chat()`/`embed()`),
 mas só é implementado provider que tenha uso real e demonstrável no
 projeto — hoje 2 de cada (LLM: NVIDIA default + Gemini; embeddings: Xenova
 local default + Voyage AI opcional), nunca um registry/plugin system
-genérico pra providers hipotéticos ainda não usados. Cache de resposta do
-LLM fica em memória (`Map` do processo), sem serviço externo (Redis,
-Memcached) — o bot é um processo único local, sem múltiplas instâncias pra
-justificar cache compartilhado; se isso mudar, é uma nova decisão, não um
-"e se precisar" antecipado. Rationale: prova que a abstração funciona (você
-consegue trocar de provider de verdade) sem violar o Principle I — a
-diferença entre "adapter" e "over-engineering" aqui é ter implementação real
-nos dois lados, não simular flexibilidade infinita.
+genérico pra providers hipotéticos ainda não usados. Rationale: prova que a
+abstração funciona (você consegue trocar de provider de verdade) sem violar
+o Principle I — a diferença entre "adapter" e "over-engineering" aqui é ter
+implementação real nos dois lados, não simular flexibilidade infinita.
+
+Cache de resposta do LLM usa **Redis** (via Docker, `docker-compose.yml`
+com um único serviço `redis:alpine`, client `ioredis`) em vez de um `Map`
+em memória — decisão revisada (ver Sync Impact Report): mesmo o bot sendo
+processo único, Redis aqui é uma peça de arquitetura deliberadamente
+realista (cache-aside), não uma necessidade técnica de compartilhar estado
+entre processos. Escopo continua contido: só o cache passa por Redis,
+nenhum outro dado (histórico de conversa, faturas simuladas, tickets)
+migra pra lá, e nenhum outro banco (Mongo/Postgres) ou serviço de
+emulação AWS (LocalStack/floci.io) entra neste projeto — essas duas coisas
+continuam sendo escopo exclusivo do projeto-âncora fintech.
 
 ## Stack e Escopo Técnico
 
@@ -99,18 +114,21 @@ OpenAI-compatible do Gemini — nenhuma dependência nova), selecionável por
 `LLM_PROVIDER`. Embeddings atrás de outro adapter (`src/embeddings.ts`):
 `@xenova/transformers` (default, local, sem custo de API) + Voyage AI
 (opcional via `VOYAGE_API_KEY`, chamado por `fetch` nativo — sem SDK novo),
-selecionável por `EMBEDDINGS_PROVIDER`. Cache de resposta do LLM em memória
-(`src/cache.ts`) pra evitar chamada duplicada em requisições idênticas.
-Vector store via `vectra` (arquivo local). Corpus inicial: regulamento
-público PIX/Bacen + FAQ de faturamento de uma operadora de telecom
-fictícia ("ConectaNet"), organizados em `data/docs/<fonte>/`. Tools
+selecionável por `EMBEDDINGS_PROVIDER`. Cache de resposta do LLM via Redis
+(`src/cache.ts`, client `ioredis`, `docker-compose.yml` com um único
+serviço `redis:alpine`) pra evitar chamada duplicada em requisições
+idênticas. Vector store via `vectra` (arquivo local). Corpus inicial:
+regulamento público PIX/Bacen + FAQ de faturamento de uma operadora de
+telecom fictícia ("ConectaNet"), organizados em `data/docs/<fonte>/`. Tools
 mockadas (sem integração externa real): `consultar_status_fatura`,
 `abrir_ticket`. Fora de escopo: WhatsApp (a alternativa não-oficial exige
 engenharia reversa do WhatsApp Web e corre risco de ban do número — Telegram
 Bot API é gratuita e não exige aprovação de negócio, ver `research.md`),
-qualquer framework de agente pronto, deploy hospedado, qualquer banco de
-dados (Redis/Mongo/Postgres) — persistência real é escopo do projeto-âncora
-fintech separado, não deste lab.
+qualquer framework de agente pronto, deploy hospedado, qualquer outro banco
+de dados (Mongo/Postgres) ou emulação AWS (LocalStack/floci.io) —
+persistência real e infra AWS são escopo do projeto-âncora fintech
+separado, não deste lab. Redis é a única exceção de infra permitida aqui,
+contida ao cache.
 
 ## Persona e Domínio do Produto
 
@@ -155,4 +173,4 @@ material, PATCH para clarificação/redação. Specs e plans gerados pelo
 `/speckit-plan` devem incluir uma checagem explícita de conformidade com os
 Core Principles antes de avançar para tasks.
 
-**Version**: 1.2.0 | **Ratified**: 2026-09-10 | **Last Amended**: 2026-09-11
+**Version**: 1.3.0 | **Ratified**: 2026-09-10 | **Last Amended**: 2026-09-11

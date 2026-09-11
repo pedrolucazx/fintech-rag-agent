@@ -65,10 +65,16 @@ function getOrSet<T>(key: string, ttlMs: number, fn: () => Promise<T>): Promise<
 ```
 
 **Contract rules**:
-- Implementação: `Map<string, { value: unknown; expiresAt: number }>` em
-  memória do processo — sem persistência entre reinícios, sem
-  compartilhamento entre processos (Constitution Principle VII: nenhum
-  Redis/banco externo neste lab).
+- Implementação: Redis via `ioredis`, subido localmente por
+  `docker-compose.yml` (serviço único `redis:alpine`) — TTL nativo do Redis
+  (`SET key value PX ttlMs`), sem persistência garantida entre reinícios do
+  container (cache, não fonte de verdade).
+- Escopo contido (Constitution Principle V/VII): Redis é usado **só** por
+  este módulo, pra este fim — histórico de conversa, faturas simuladas e
+  tickets continuam sem banco, do jeito que já estava.
 - `key` é responsabilidade de quem chama (`llm.ts` monta a partir de
   `provider + JSON.stringify(messages, tools)`), `cache.ts` não sabe nada
-  sobre LLM especificamente — é um cache genérico reutilizável.
+  sobre LLM especificamente — é um cache genérico reutilizável. A
+  assinatura da função não muda em relação à primeira versão (só a
+  implementação interna trocou de `Map` pra Redis) — é exatamente o que a
+  interface deveria proteger.
