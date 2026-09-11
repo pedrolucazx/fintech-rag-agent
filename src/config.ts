@@ -6,18 +6,14 @@ try {
 
 function required(name: string): string {
   const value = process.env[name];
-  if (!value || value === "") {
+  if (!value) {
     throw new Error(`Missing required env var: ${name} (see .env.example)`);
   }
   return value;
 }
 
 function optional(name: string, defaultValue: string): string {
-  const value = process.env[name];
-  if (!value || value === "") {
-    return defaultValue;
-  }
-  return value;
+  return process.env[name] || defaultValue;
 }
 
 export const config = {

@@ -13,9 +13,18 @@ export async function embed(text: string): Promise<number[]> {
   return embedXenova(text);
 }
 
-async function embedXenova(text: string): Promise<number[]> {
+// Cache the in-flight Promise, not the resolved value — caching the value
+// leaves a window between the "not loaded yet" check and the await where two
+// concurrent embed() calls both start loading the model.
+let extractorPromise: ReturnType<typeof loadExtractor> | undefined;
+async function loadExtractor() {
   const { pipeline } = await import("@xenova/transformers");
-  const embedder = await pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2");
+  return pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2");
+}
+
+async function embedXenova(text: string): Promise<number[]> {
+  if (!extractorPromise) extractorPromise = loadExtractor();
+  const embedder = await extractorPromise;
   const output = await embedder(text, { pooling: "mean", normalize: true });
   return Array.from(output.data) as number[];
 }

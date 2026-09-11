@@ -25,9 +25,8 @@ describe("llm.ts — provider selection (no network calls)", () => {
     process.env.EMBEDDINGS_PROVIDER = "";
     process.env.VOYAGE_API_KEY = "";
 
-    // Need to re-import to get fresh config
-    for (const mod of Object.keys(await import.meta.resolve("./config.js"))) {}
-    // ESM modules are cached, so we test the current config state
+    // ESM modules are cached across tests, so this reads the same config
+    // singleton as the previous test — getters re-read process.env live.
     const { config } = await import("./config.js");
     // The test just verifies the config object reads env correctly
     assert.strictEqual(config.llmProvider, "gemini");

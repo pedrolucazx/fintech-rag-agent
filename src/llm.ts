@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import { config } from "./config.js";
 import { getOrSet } from "./cache.js";
+import { log } from "./logger.js";
 
 export type ChatMessage = { role: "system" | "user" | "assistant" | "tool"; content: string };
 export type ToolSchema = { name: string; description: string; parameters: Record<string, unknown> };
@@ -54,6 +55,14 @@ function toOpenAiTool(tool: ToolSchema) {
   };
 }
 
+// ponytail: keyed on message/tool content only, no chatId — two different
+// chats that happen to send byte-identical messages (only realistic for a
+// first message with no history yet) share a cache hit. Adding chatId would
+// mean threading it through chat()'s public signature and every ChatFn
+// caller in harness.ts (touched independently by 3 other in-flight
+// branches right now); also consistent with spec.md's Assumptions, which
+// already document no per-user ownership/isolation elsewhere in this bot.
+// Revisit if per-user isolation is ever added for real.
 function buildCacheKey(messages: ChatMessage[], tools: ToolSchema[]): string {
   const provider = config.llmProvider;
   const payload = JSON.stringify({ provider, messages, tools });
@@ -78,7 +87,7 @@ async function callLlm(messages: ChatMessage[], tools: ToolSchema[]): Promise<Ch
   try {
     response = await call();
   } catch (err) {
-    console.warn("[llm] call failed, retrying once", { err: String(err), provider: config.llmProvider });
+    log.warn("llm call failed, retrying once", { err: String(err), provider: config.llmProvider });
     response = await call();
   }
 
