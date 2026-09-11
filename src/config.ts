@@ -6,8 +6,16 @@ try {
 
 function required(name: string): string {
   const value = process.env[name];
-  if (!value) {
+  if (!value || value === "") {
     throw new Error(`Missing required env var: ${name} (see .env.example)`);
+  }
+  return value;
+}
+
+function optional(name: string, defaultValue: string): string {
+  const value = process.env[name];
+  if (!value || value === "") {
+    return defaultValue;
   }
   return value;
 }
@@ -18,5 +26,17 @@ export const config = {
   },
   get nvidiaApiKey() {
     return required("NVIDIA_API_KEY");
+  },
+  get llmProvider() {
+    return optional("LLM_PROVIDER", "nvidia");
+  },
+  get geminiApiKey() {
+    return optional("GEMINI_API_KEY", "");
+  },
+  get embeddingsProvider() {
+    return optional("EMBEDDINGS_PROVIDER", "xenova");
+  },
+  get voyageApiKey() {
+    return optional("VOYAGE_API_KEY", "");
   },
 };

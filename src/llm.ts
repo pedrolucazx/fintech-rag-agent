@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { config } from "./config.js";
-import { log } from "./logger.js";
+import { getOrSet } from "./cache.js";
 
 export type ChatMessage = { role: "system" | "user" | "assistant" | "tool"; content: string };
 export type ToolSchema = { name: string; description: string; parameters: Record<string, unknown> };
@@ -8,18 +8,43 @@ export type ChatResult =
   | { type: "tool_call"; name: string; args: Record<string, unknown> }
   | { type: "text"; content: string };
 
-const MODEL = "meta/llama-3.1-8b-instruct";
+const NVIDIA_MODEL = "meta/llama-3.1-8b-instruct";
+const GEMINI_MODEL = "gemini-1.5-flash";
 const TIMEOUT_MS = 15_000;
+const CACHE_TTL_MS = 5 * 60 * 1000;
 
-let client: OpenAI | undefined;
-function getClient(): OpenAI {
-  if (!client) {
-    client = new OpenAI({
+let nvidiaClient: OpenAI | undefined;
+let geminiClient: OpenAI | undefined;
+
+function getNvidiaClient(): OpenAI {
+  if (!nvidiaClient) {
+    nvidiaClient = new OpenAI({
       baseURL: "https://integrate.api.nvidia.com/v1",
       apiKey: config.nvidiaApiKey,
     });
   }
-  return client;
+  return nvidiaClient;
+}
+
+function getGeminiClient(): OpenAI {
+  if (!geminiClient) {
+    if (!config.geminiApiKey) {
+      throw new Error("GEMINI_API_KEY is required when LLM_PROVIDER=gemini (see .env.example)");
+    }
+    geminiClient = new OpenAI({
+      baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
+      apiKey: config.geminiApiKey,
+    });
+  }
+  return geminiClient;
+}
+
+function getClient(): OpenAI {
+  return config.llmProvider === "gemini" ? getGeminiClient() : getNvidiaClient();
+}
+
+function getModel(): string {
+  return config.llmProvider === "gemini" ? GEMINI_MODEL : NVIDIA_MODEL;
 }
 
 function toOpenAiTool(tool: ToolSchema) {
@@ -29,11 +54,20 @@ function toOpenAiTool(tool: ToolSchema) {
   };
 }
 
-export async function chat(messages: ChatMessage[], tools: ToolSchema[]): Promise<ChatResult> {
+function buildCacheKey(messages: ChatMessage[], tools: ToolSchema[]): string {
+  const provider = config.llmProvider;
+  const payload = JSON.stringify({ provider, messages, tools });
+  return `llm:${provider}:${payload}`;
+}
+
+async function callLlm(messages: ChatMessage[], tools: ToolSchema[]): Promise<ChatResult> {
+  const client = getClient();
+  const model = getModel();
+
   const call = () =>
-    getClient().chat.completions.create(
+    client.chat.completions.create(
       {
-        model: MODEL,
+        model,
         messages: messages as OpenAI.Chat.ChatCompletionMessageParam[],
         tools: tools.length > 0 ? tools.map(toOpenAiTool) : undefined,
       },
@@ -44,7 +78,7 @@ export async function chat(messages: ChatMessage[], tools: ToolSchema[]): Promis
   try {
     response = await call();
   } catch (err) {
-    log.warn("llm call failed, retrying once", { err: String(err) });
+    console.warn("[llm] call failed, retrying once", { err: String(err), provider: config.llmProvider });
     response = await call();
   }
 
@@ -58,4 +92,9 @@ export async function chat(messages: ChatMessage[], tools: ToolSchema[]): Promis
     };
   }
   return { type: "text", content: choice.message.content ?? "" };
+}
+
+export async function chat(messages: ChatMessage[], tools: ToolSchema[]): Promise<ChatResult> {
+  const key = buildCacheKey(messages, tools);
+  return getOrSet(key, CACHE_TTL_MS, () => callLlm(messages, tools));
 }
