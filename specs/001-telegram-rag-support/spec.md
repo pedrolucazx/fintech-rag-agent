@@ -6,7 +6,7 @@
 
 **Status**: Draft
 
-**Input**: User description: "Bot de suporte no Telegram que simula um agente de fintech: responde dúvidas sobre integração de pagamento (PIX) usando RAG em cima de documentação real de múltiplas fontes (PIX/Bacen, Celcoin, Stripe), e também consegue executar ações via tool-calling — consultar status de uma transação e abrir um chamado de suporte. Projeto de aprendizado/portfólio, não é serviço real."
+**Input**: User description: "Bot de suporte técnico no Telegram, voltado a desenvolvedores que integram pagamentos (PIX) — não ao usuário final de um app bancário. Responde dúvidas de implementação usando RAG em cima de documentação real de múltiplas fontes (PIX/Bacen, Celcoin, Stripe), consegue consultar o status real de uma transação junto ao provedor (uso de diagnóstico, ex.: reconciliar com o que um webhook informou), e consegue abrir um chamado de suporte. Projeto de aprendizado/portfólio, não é serviço real."
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -42,28 +42,36 @@ veio a informação quando perguntas cruzam mais de um documento.
 
 ---
 
-### User Story 2 - Consultar status de uma transação (Priority: P2)
+### User Story 2 - Conferir status real de uma transação para depurar webhook (Priority: P2)
 
-Um usuário pergunta pelo status de uma transação específica (ex.: "qual o
-status da transação 12345?"). O bot identifica que precisa executar uma
-consulta (não apenas responder com texto) e retorna o status.
+Um desenvolvedor integrando pagamentos relata um problema de sincronização
+(ex.: "o webhook da transação 12345 não chegou" ou "recebi status pendente
+no webhook, mas já faz tempo"). O bot identifica que, para ajudar, precisa
+consultar o status real da transação junto ao provedor (não apenas responder
+com texto da documentação) e retorna esse status, para comparação com o que
+o webhook informou.
 
 **Why this priority**: Demonstra a diferença entre "responder com base em
-documentos" (RAG) e "agir sobre um sistema" (ação real) — é o que separa um
-agente de um buscador de documentos.
+documentos" (RAG) e "agir sobre um sistema" (ação real) — mantendo a persona
+correta: um bot de suporte a desenvolvedores não expõe "minha transação"
+como se o desenvolvedor fosse o usuário final; consultar status só faz
+sentido como ferramenta de diagnóstico de integração (reconciliação webhook
+vs. provedor), um cenário real de quem já operou PIX em produção.
 
-**Independent Test**: Perguntar pelo status de uma transação e verificar que
-o bot retorna um status (ainda que de dado simulado), não uma resposta
-genérica de RAG.
+**Independent Test**: Relatar um problema de webhook mencionando um
+identificador de transação e verificar que o bot consulta e retorna o
+status real daquela transação (ainda que de dado simulado), a usa para
+ajudar no diagnóstico — não uma resposta genérica de RAG.
 
 **Acceptance Scenarios**:
 
-1. **Given** o usuário informa um identificador de transação, **When**
-   pergunta o status, **Then** o bot retorna um status correspondente àquele
-   identificador.
-2. **Given** o usuário pergunta pelo status sem informar um identificador,
-   **When** o bot não tem essa informação, **Then** o bot pede o
-   identificador antes de tentar consultar.
+1. **Given** o desenvolvedor relata que o webhook de uma transação não
+   chegou (ou chegou com um status que ele quer confirmar) e informa o
+   identificador, **When** pede para conferir o status real, **Then** o bot
+   consulta e retorna o status correspondente àquele identificador.
+2. **Given** o desenvolvedor relata um problema de webhook sem informar o
+   identificador da transação, **When** o bot não tem essa informação,
+   **Then** o bot pede o identificador antes de tentar consultar.
 
 ---
 
@@ -121,8 +129,10 @@ criado.
 - **FR-003**: O sistema DEVE reconhecer quando uma pergunta não é coberta
   pela documentação indexada e comunicar isso ao usuário em vez de responder
   com informação não verificada.
-- **FR-004**: O sistema DEVE permitir consultar o status de uma transação a
-  partir de um identificador informado pelo usuário.
+- **FR-004**: O sistema DEVE permitir consultar o status real de uma
+  transação a partir de um identificador informado pelo usuário, como
+  ferramenta de diagnóstico de integração (ex.: reconciliar com o que um
+  webhook informou) — não como autoatendimento de usuário final.
 - **FR-005**: O sistema DEVE permitir registrar um chamado de suporte a
   partir de uma descrição de problema fornecida pelo usuário, capturando
   minimamente um assunto e uma descrição.

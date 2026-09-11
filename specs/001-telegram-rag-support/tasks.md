@@ -82,13 +82,16 @@ respostas fundamentadas em documentação real de múltiplas fontes.
 
 ---
 
-## Phase 4: User Story 2 - Consultar status de uma transação (Priority: P2)
+## Phase 4: User Story 2 - Conferir status real de uma transação para depurar webhook (Priority: P2)
 
 **Goal**: o bot decide dinamicamente entre responder via RAG e executar uma
-ação (consulta), em vez de só recuperar texto.
+ação (consulta), em vez de só recuperar texto — usada como diagnóstico de
+integração (reconciliação webhook vs. provedor), não autoatendimento do
+usuário final.
 
-**Independent Test**: perguntar status de uma transação existente e de uma
-inexistente, e sem informar o id — ver `quickstart.md` → US2.
+**Independent Test**: relatar um problema de webhook informando o id de uma
+transação existente e de uma inexistente, e sem informar o id — ver
+`quickstart.md` → US2.
 
 ### Tests for User Story 2
 
@@ -98,7 +101,7 @@ inexistente, e sem informar o id — ver `quickstart.md` → US2.
 
 - [ ] T021 [P] [US2] Implementar schema + dados simulados + execução de `consultar_status_transacao` em `src/tools.ts` (per contracts/tools.md e data-model.md → SimulatedTransaction)
 - [ ] T022 [US2] Registrar a tool no harness: `src/harness.ts` passa o schema ao LLM na chamada, executa a função local quando o LLM retorna `tool_call`, injeta o resultado de volta no histórico e repete o loop
-- [ ] T023 [US2] Ajustar system prompt para pedir o identificador quando o usuário perguntar status sem informá-lo (Acceptance Scenario 2 da US2)
+- [ ] T023 [US2] Ajustar system prompt para pedir o identificador quando o desenvolvedor relatar um problema de webhook sem informá-lo (Acceptance Scenario 2 da US2)
 - [ ] T024 [US2] Validação manual: rodar os 2 cenários de `quickstart.md` → US2
 
 **Checkpoint**: bot decide dinamicamente entre RAG e tool-call — demonstra a

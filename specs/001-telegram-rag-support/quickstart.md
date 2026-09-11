@@ -37,12 +37,13 @@ peça.
    **Esperado**: bot diz que não tem essa informação, não inventa resposta
    (FR-003).
 
-### US2 — Consultar status (P2)
+### US2 — Diagnóstico de webhook (P2)
 
-1. Pergunte "qual o status da transação `<id-existente>`?"
+1. Diga "o webhook da transação `<id-existente>` não chegou, pode conferir o
+   status real?"
    **Esperado**: retorna o status correspondente (ver dados simulados em
-   `tools.ts`).
-2. Pergunte "qual o status da minha transação?" sem informar o id.
+   `tools.ts`), útil para comparar com o que o webhook informou.
+2. Diga "meu webhook não chegou" sem informar o id da transação.
    **Esperado**: bot pergunta o id antes de tentar consultar.
 
 ### US3 — Abrir ticket + multi-turno (P3)

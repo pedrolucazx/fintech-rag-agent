@@ -43,6 +43,9 @@ requisito de persistência entre reinícios).
 ## SimulatedTransaction (Transação simulada)
 
 Registro fictício de pagamento usado pela tool `consultar_status_transacao`.
+Consultada como ferramenta de diagnóstico de integração (ex.: desenvolvedor
+reconciliando o status real com o que um webhook informou) — não é
+autoatendimento do usuário final.
 
 | Campo | Tipo | Descrição |
 |---|---|---|

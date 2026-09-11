@@ -12,7 +12,7 @@ Cobre User Story 2 / FR-004.
 ```json
 {
   "name": "consultar_status_transacao",
-  "description": "Consulta o status de uma transação PIX a partir do identificador",
+  "description": "Consulta o status real de uma transação PIX junto ao provedor, a partir do identificador. Uso de diagnóstico de integração (ex.: reconciliar com o que um webhook informou), não autoatendimento do usuário final.",
   "parameters": {
     "type": "object",
     "properties": {
