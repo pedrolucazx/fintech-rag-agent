@@ -1,6 +1,7 @@
+import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { pipeline } from "@xenova/transformers";
 import { LocalIndex } from "vectra";
+import { embed, currentEmbeddingsProvider } from "./embeddings.js";
 
 export type RetrievedChunk = {
   text: string;
@@ -14,30 +15,36 @@ type ChunkMetadata = {
   text: string;
 };
 
-const EMBEDDING_MODEL = "Xenova/all-MiniLM-L6-v2";
-// ponytail: fixed threshold calibrated against the seed corpus (matches ~0.7+, unrelated ~0.35-0.4); revisit if corpus grows/diversifies
 export const MIN_SCORE = 0.5;
 export const DEFAULT_INDEX_DIR = path.join(process.cwd(), "data", "index");
 
-type Extractor = Awaited<ReturnType<typeof pipeline<"feature-extraction">>>;
+function providerFile(indexDir: string): string {
+  return path.join(path.dirname(indexDir), "index-provider.json");
+}
 
-// Cache the in-flight Promise, not the resolved value — caching the value
-// leaves a window between the `!extractor` check and the `await` where two
-// concurrent embed() calls both see it as unset and each load the model.
-let extractorPromise: Promise<Extractor> | undefined;
-function getExtractor(): Promise<Extractor> {
-  if (!extractorPromise) {
-    extractorPromise = pipeline("feature-extraction", EMBEDDING_MODEL);
+/** Records which embeddings provider built the index at `indexDir`, so a later query with a different provider can fail loudly instead of returning meaningless scores. */
+export function recordIndexProvider(indexDir: string = DEFAULT_INDEX_DIR): void {
+  writeFileSync(providerFile(indexDir), JSON.stringify({ provider: currentEmbeddingsProvider() }));
+}
+
+function assertProviderMatchesIndex(indexDir: string): void {
+  let recorded: string;
+  try {
+    recorded = (JSON.parse(readFileSync(providerFile(indexDir), "utf-8")) as { provider: string }).provider;
+  } catch {
+    return; // no record (older index or first run) — nothing to compare against
   }
-  return extractorPromise;
+  const current = currentEmbeddingsProvider();
+  if (recorded !== current) {
+    throw new Error(
+      `Index at ${indexDir} was built with EMBEDDINGS_PROVIDER=${recorded}, but the query is running with ${current}. Re-run "npm run ingest" with the same provider, or unset EMBEDDINGS_PROVIDER to match the index.`,
+    );
+  }
 }
 
-export async function embed(text: string): Promise<number[]> {
-  const model = await getExtractor();
-  const output = await model(text, { pooling: "mean", normalize: true });
-  return Array.from(output.data as Float32Array);
-}
-
+/**
+ * Retrieve top‑K most similar chunks for a query.
+ */
 export async function retrieve(
   query: string,
   topK = 5,
@@ -48,10 +55,16 @@ export async function retrieve(
     return [];
   }
 
+  assertProviderMatchesIndex(indexDir);
+
   const queryVector = await embed(query);
   const results = await index.queryItems<ChunkMetadata>(queryVector, query, topK);
 
   return results
     .filter((r) => r.score >= MIN_SCORE)
-    .map((r) => ({ text: r.item.metadata.text, source: r.item.metadata.source, score: r.score }));
+    .map((r) => ({
+      text: r.item.metadata.text,
+      source: r.item.metadata.source,
+      score: r.score,
+    }));
 }

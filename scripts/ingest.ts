@@ -1,7 +1,8 @@
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { LocalIndex } from "vectra";
-import { embed, DEFAULT_INDEX_DIR } from "../src/rag.js";
+import { embed } from "../src/embeddings.js";
+import { DEFAULT_INDEX_DIR, recordIndexProvider } from "../src/rag.js";
 import { log } from "../src/logger.js";
 
 const DOCS_DIR = path.join(process.cwd(), "data", "docs");
@@ -74,6 +75,7 @@ async function main(): Promise<void> {
   }
   await index.createIndex();
   await index.batchInsertItems(items);
+  recordIndexProvider(DEFAULT_INDEX_DIR);
 
   log.info("ingest complete", { chunks: chunks.length, sources: new Set(chunks.map((c) => c.source)).size });
 }

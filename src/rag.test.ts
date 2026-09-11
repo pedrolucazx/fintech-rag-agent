@@ -4,7 +4,8 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { LocalIndex } from "vectra";
-import { embed, retrieve } from "./rag.js";
+import { embed } from "./embeddings.js";
+import { retrieve } from "./rag.js";
 
 async function buildFixtureIndex(): Promise<string> {
   const dir = mkdtempSync(path.join(tmpdir(), "rag-test-"));
