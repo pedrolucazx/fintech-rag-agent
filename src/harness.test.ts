@@ -2,7 +2,12 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { runHarness } from "./harness.js";
 import type { ChatMessage, ChatResult, ToolSchema } from "./llm.js";
+import type { RetrievedChunk } from "./rag.js";
 import { abrirTicketSchema, consultarStatusFaturaSchema } from "./tools.js";
+
+// Unit tests mock retrieval too — without this, runHarness falls back to the
+// real embed()/vectra index and these stop being fast, deterministic unit tests.
+const mockRetrieve = async (_query: string): Promise<RetrievedChunk[]> => [];
 
 test("returns text directly when the LLM responds with final text", async () => {
   const mockChat = async (_messages: ChatMessage[], _tools: ToolSchema[]): Promise<ChatResult> => ({
@@ -10,7 +15,7 @@ test("returns text directly when the LLM responds with final text", async () => 
     content: "oi",
   });
 
-  const result = await runHarness("chat-1", "oi", mockChat);
+  const result = await runHarness("chat-1", "oi", mockChat, mockRetrieve);
   assert.equal(result, "oi");
 });
 
@@ -34,13 +39,13 @@ test("consults invoices and preserves the tool exchange for the next turn", asyn
       return { type: "text", content: invoice.status };
     };
     const chatId = `invoice-${id}`;
-    assert.equal(await runHarness(chatId, `Minha fatura ${id} já foi paga?`, mockChat),
+    assert.equal(await runHarness(chatId, `Minha fatura ${id} já foi paga?`, mockChat, mockRetrieve),
       id === "fat_202509" ? "paga" : "nao_encontrado");
     assert.equal(calls, 2);
     await runHarness(chatId, "Qual era a fatura?", async (messages) => {
       assert.equal(messages.find((message) => message.role === "tool")?.toolCall?.args.id, id);
       return { type: "text", content: id };
-    });
+    }, mockRetrieve);
   }
 });
 
@@ -51,7 +56,7 @@ test("asks for a missing identifier and consults after the user supplies it", as
     assert.match(messages[0].content, /antes de chamar a tool/);
     assert.equal(messages.some((message) => message.role === "tool"), false);
     return { type: "text", content: "Qual o identificador da fatura?" };
-  }), "Qual o identificador da fatura?");
+  }, mockRetrieve), "Qual o identificador da fatura?");
   let calls = 0;
   assert.equal(await runHarness(chatId, "fat_202509", async (messages) => {
     if (++calls === 1) {
@@ -59,7 +64,7 @@ test("asks for a missing identifier and consults after the user supplies it", as
       return { type: "tool_call", name: "consultar_status_fatura", args: { id: "fat_202509" } };
     }
     return { type: "text", content: JSON.parse(messages.at(-1)!.content).status };
-  }), "paga");
+  }, mockRetrieve), "paga");
 });
 
 test("invalid tool arguments return an error to the model without stopping the conversation", async () => {
@@ -68,7 +73,7 @@ test("invalid tool arguments return an error to the model without stopping the c
     if (++calls === 1) return { type: "tool_call", name: "consultar_status_fatura", args: {} };
     assert.match(JSON.parse(messages.at(-1)!.content).error, /identificador/);
     return { type: "text", content: "Qual o identificador da fatura?" };
-  });
+  }, mockRetrieve);
   assert.equal(result, "Qual o identificador da fatura?");
   assert.equal(calls, 2);
 });
@@ -102,7 +107,7 @@ test("LLM adapter sends the assistant tool call and matching result over the SDK
     });
     return Response.json({ choices: [{ message: { role: "assistant", content: "Sua fatura está paga." } }] });
   });
-  assert.equal(await runHarness("invoice-sdk", "Minha fatura fat_202509 já foi paga?"), "Sua fatura está paga.");
+  assert.equal(await runHarness("invoice-sdk", "Minha fatura fat_202509 já foi paga?", undefined, mockRetrieve), "Sua fatura está paga.");
   assert.equal(calls, 2);
 });
 
@@ -116,7 +121,7 @@ test("executes a tool call then makes a second call before returning text", asyn
     return { type: "text", content: "done" };
   };
 
-  const result = await runHarness("chat-2", "faz algo", mockChat);
+  const result = await runHarness("chat-2", "faz algo", mockChat, mockRetrieve);
   assert.equal(result, "done");
   assert.equal(calls, 2);
 });

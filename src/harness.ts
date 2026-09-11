@@ -8,12 +8,15 @@ import {
   consultarStatusFatura,
   consultarStatusFaturaSchema,
 } from "./tools.js";
+import { retrieve, type RetrievedChunk } from "./rag.js";
 
 const systemPrompt: ChatMessage = {
   role: "system",
   content:
     "Você é o assistente de atendimento financeiro da ConectaNet, uma operadora de internet. " +
     "Responda dúvidas de fatura e pagamento de forma direta e educada, em português. " +
+    "Baseie sua resposta apenas no contexto fornecido em mensagens 'system' marcadas como Contexto. " +
+    "Se o contexto vier vazio ou não cobrir a pergunta, diga que não tem essa informação — nunca invente. " +
     "Para consultar status de fatura/pagamento, use consultar_status_fatura e responda com base no resultado. " +
     "Se não houver identificador da fatura na conversa, pergunte ao cliente o identificador " +
     "(ou mês de referência) antes de chamar a tool. Nunca invente ou assuma um id; " +
@@ -23,6 +26,14 @@ const systemPrompt: ChatMessage = {
     "do problema relatado pelo cliente, incluindo dados relevantes já mencionados. Se o cliente apenas pedir " +
     "um chamado sem explicar o problema, pergunte o que aconteceu antes de chamar a tool.",
 };
+
+function contextMessage(chunks: RetrievedChunk[]): ChatMessage {
+  const content =
+    chunks.length === 0
+      ? "Contexto: nenhum documento relevante encontrado."
+      : "Contexto:\n" + chunks.map((c) => `[fonte: ${c.source}] ${c.text}`).join("\n\n");
+  return { role: "system", content };
+}
 
 type ToolDefinition = {
   schema: ToolSchema;
@@ -74,16 +85,28 @@ function withChatLock<T>(chatId: string, fn: () => Promise<T>): Promise<T> {
 
 const MAX_TOOL_ITERATIONS = 5;
 
-export async function runHarness(chatId: string, userMessage: string, chatFn: ChatFn = chat): Promise<string> {
-  return withChatLock(chatId, () => runHarnessTurn(chatId, userMessage, chatFn));
+export async function runHarness(
+  chatId: string,
+  userMessage: string,
+  chatFn: ChatFn = chat,
+  retrieveFn: (query: string) => Promise<RetrievedChunk[]> = retrieve,
+): Promise<string> {
+  return withChatLock(chatId, () => runHarnessTurn(chatId, userMessage, chatFn, retrieveFn));
 }
 
-async function runHarnessTurn(chatId: string, userMessage: string, chatFn: ChatFn): Promise<string> {
+async function runHarnessTurn(
+  chatId: string,
+  userMessage: string,
+  chatFn: ChatFn,
+  retrieveFn: (query: string) => Promise<RetrievedChunk[]>,
+): Promise<string> {
   history.append(chatId, { role: "user", content: userMessage, toolCall: null, timestamp: Date.now() });
+  const retrievedChunks = await retrieveFn(userMessage);
 
   for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
     const messages: ChatMessage[] = [
       systemPrompt,
+      contextMessage(retrievedChunks),
       ...history.get(chatId).map(({ role, content, toolCall }) => ({ role, content, toolCall })),
     ];
     const result = await chatFn(
@@ -92,7 +115,9 @@ async function runHarnessTurn(chatId: string, userMessage: string, chatFn: ChatF
     );
 
     if (result.type === "tool_call") {
-      const toolCall = { id: result.id ?? randomUUID(), name: result.name, args: result.args };
+      // `||`, not `??` — a provider-returned empty string is falsy-but-defined
+      // and should be treated as "no id" same as null/undefined.
+      const toolCall = { id: result.id || randomUUID(), name: result.name, args: result.args };
       history.append(chatId, {
         role: "assistant", content: "", toolCall, timestamp: Date.now(),
       });
