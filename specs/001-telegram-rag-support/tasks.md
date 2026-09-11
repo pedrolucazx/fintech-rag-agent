@@ -27,12 +27,12 @@ na raiz do repositório.
 
 **Purpose**: inicialização do projeto Node/TS
 
-- [ ] T001 Criar estrutura de diretórios per plan.md: `src/`, `data/docs/regulamentacao-pix/`, `data/docs/faturamento-conectanet/`, `data/index/`, `scripts/`
-- [ ] T002 Inicializar projeto Node com `package.json` + `tsconfig.json` (TypeScript 5, target Node 20)
-- [ ] T003 [P] Instalar dependências de runtime: `grammy`, `openai`, `@xenova/transformers`, `vectra`
-- [ ] T004 [P] Instalar dependências de dev: `typescript`, `tsx` (execução direta de TS), `@types/node`
-- [ ] T005 [P] Criar `.env.example` com `TELEGRAM_BOT_TOKEN` e `NVIDIA_API_KEY` (documentação, sem valores reais) — expandido em Phase 7 (T036) com as vars dos providers extras
-- [ ] T006 [P] Adicionar scripts `dev`, `ingest`, `test` ao `package.json`
+- [x] T001 Criar estrutura de diretórios per plan.md: `src/`, `data/docs/regulamentacao-pix/`, `data/docs/faturamento-conectanet/`, `data/index/`, `scripts/`
+- [x] T002 Inicializar projeto Node com `package.json` + `tsconfig.json` (TypeScript 5, target Node 20)
+- [x] T003 [P] Instalar dependências de runtime: `grammy`, `openai`, `@xenova/transformers`, `vectra`
+- [x] T004 [P] Instalar dependências de dev: `typescript`, `tsx` (execução direta de TS), `@types/node`
+- [x] T005 [P] Criar `.env.example` com `TELEGRAM_BOT_TOKEN` e `NVIDIA_API_KEY` (documentação, sem valores reais) — expandido em Phase 7 (T036) com as vars dos providers extras
+- [x] T006 [P] Adicionar scripts `dev`, `ingest`, `test` ao `package.json`
 
 ---
 
@@ -43,13 +43,13 @@ integração Telegram↔LLM, sem RAG/tools ainda. Bloqueia todas as user stories
 
 **⚠️ CRITICAL**: nenhuma user story começa antes desta fase estar completa
 
-- [ ] T007 Implementar carregamento de config/segredos (lê `TELEGRAM_BOT_TOKEN`, `NVIDIA_API_KEY` de `.env`, falha com mensagem clara se faltar) em `src/config.ts`
-- [ ] T008 [P] Implementar logger estruturado leve (sem dependência nova — `console` com prefixo/nível) em `src/logger.ts`
-- [ ] T009 [P] Implementar client do LLM (NVIDIA NIM via SDK `openai`, timeout + 1 retry simples em erro transitório) em `src/llm.ts` — vira adapter multi-provider na Phase 7 (T037), implementar T009 já com a assinatura `chat(messages, tools)` de contracts/providers.md pra não retrabalhar
-- [ ] T010 [P] Implementar histórico de conversa em memória, chaveado por `chatId` (`ConversationTurn[]` — ver data-model.md) em `src/history.ts`
-- [ ] T011 Implementar o loop do harness (`src/harness.ts`): monta mensagens (system + histórico), chama `llm.ts`, decide entre `tool_call` e resposta final, repete até resposta final — SEM tools/RAG registrados ainda (registro vazio, extensível nas fases seguintes)
-- [ ] T012 Implementar `src/bot.ts`: setup do `grammy` em long polling, roteia cada mensagem recebida para `harness.ts` e responde com o texto final (depende de T007, T010, T011)
-- [ ] T013 [P] Teste mínimo do loop de decisão do harness (mock do LLM retornando tool_call vs texto final) em `src/harness.test.ts`
+- [x] T007 Implementar carregamento de config/segredos (lê `TELEGRAM_BOT_TOKEN`, `NVIDIA_API_KEY` de `.env`, falha com mensagem clara se faltar) em `src/config.ts`
+- [x] T008 [P] Implementar logger estruturado leve (sem dependência nova — `console` com prefixo/nível) em `src/logger.ts`
+- [x] T009 [P] Implementar client do LLM (NVIDIA NIM via SDK `openai`, timeout + 1 retry simples em erro transitório) em `src/llm.ts` — vira adapter multi-provider na Phase 7 (T037), implementar T009 já com a assinatura `chat(messages, tools)` de contracts/providers.md pra não retrabalhar
+- [x] T010 [P] Implementar histórico de conversa em memória, chaveado por `chatId` (`ConversationTurn[]` — ver data-model.md) em `src/history.ts`
+- [x] T011 Implementar o loop do harness (`src/harness.ts`): monta mensagens (system + histórico), chama `llm.ts`, decide entre `tool_call` e resposta final, repete até resposta final — SEM tools/RAG registrados ainda (registro vazio, extensível nas fases seguintes)
+- [x] T012 Implementar `src/bot.ts`: setup do `grammy` em long polling, roteia cada mensagem recebida para `harness.ts` e responde com o texto final (depende de T007, T010, T011)
+- [x] T013 [P] Teste mínimo do loop de decisão do harness (mock do LLM retornando tool_call vs texto final) em `src/harness.test.ts`
 
 **Checkpoint**: bot responde no Telegram com texto gerado pelo LLM (ainda sem
 fundamentação em documentos e sem tools) — valida a fiação

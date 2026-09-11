@@ -3,6 +3,7 @@ dist/
 .env
 .env.local
 data/tickets.json
+data/index/
 *.log
 
 # agent local state (may hold credentials/session data)
