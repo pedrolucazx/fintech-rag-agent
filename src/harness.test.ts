@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { runHarness } from "./harness.js";
 import type { ChatMessage, ChatResult, ToolSchema } from "./llm.js";
-import { consultarStatusFaturaSchema } from "./tools.js";
+import { abrirTicketSchema, consultarStatusFaturaSchema } from "./tools.js";
 
 test("returns text directly when the LLM responds with final text", async () => {
   const mockChat = async (_messages: ChatMessage[], _tools: ToolSchema[]): Promise<ChatResult> => ({
@@ -18,7 +18,7 @@ test("consults invoices and preserves the tool exchange for the next turn", asyn
   for (const id of ["fat_202509", "fat_000000"]) {
     let calls = 0;
     const mockChat = async (messages: ChatMessage[], tools: ToolSchema[]): Promise<ChatResult> => {
-      assert.deepEqual(tools, [consultarStatusFaturaSchema]);
+      assert.deepEqual(tools, [consultarStatusFaturaSchema, abrirTicketSchema]);
       if (++calls === 1) {
         return { type: "tool_call", id: "call-invoice", name: "consultar_status_fatura", args: { id } };
       }
@@ -87,7 +87,10 @@ test("LLM adapter sends the assistant tool call and matching result over the SDK
   };
   t.mock.method(globalThis, "fetch", async (_input: unknown, init: RequestInit) => {
     const body = JSON.parse(init.body as string);
-    assert.deepEqual(body.tools, [{ type: "function", function: consultarStatusFaturaSchema }]);
+    assert.deepEqual(body.tools, [
+      { type: "function", function: consultarStatusFaturaSchema },
+      { type: "function", function: abrirTicketSchema },
+    ]);
     assert.equal(body.parallel_tool_calls, false);
     if (++calls === 1) {
       return Response.json({ choices: [{ message: { role: "assistant", content: null, tool_calls: [toolCall] } }] });
