@@ -16,6 +16,7 @@ function getExtractor(): Promise<Extractor> {
 }
 
 async function embedVoyage(text: string): Promise<number[]> {
+  if (!config.voyageApiKey) throw new Error("VOYAGE_API_KEY is required when EMBEDDINGS_PROVIDER=voyage");
   const call = () =>
     fetch("https://api.voyageai.com/v1/embeddings", {
       method: "POST",
@@ -23,7 +24,7 @@ async function embedVoyage(text: string): Promise<number[]> {
         Authorization: `Bearer ${config.voyageApiKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ input: text }),
+      body: JSON.stringify({ model: "voyage-3", input: [text] }),
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
 
@@ -45,7 +46,7 @@ async function embedVoyage(text: string): Promise<number[]> {
 
 /** Provider selected via `EMBEDDINGS_PROVIDER` ("xenova" default, or "voyage"). */
 export function currentEmbeddingsProvider(): string {
-  return (process.env.EMBEDDINGS_PROVIDER ?? "xenova").toLowerCase();
+  return config.embeddingsProvider.toLowerCase();
 }
 
 /**

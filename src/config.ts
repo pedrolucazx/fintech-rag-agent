@@ -12,6 +12,10 @@ function required(name: string): string {
   return value;
 }
 
+function optional(name: string, defaultValue: string): string {
+  return process.env[name] || defaultValue;
+}
+
 export const config = {
   get telegramBotToken() {
     return required("TELEGRAM_BOT_TOKEN");
@@ -19,7 +23,16 @@ export const config = {
   get nvidiaApiKey() {
     return required("NVIDIA_API_KEY");
   },
+  get llmProvider() {
+    return optional("LLM_PROVIDER", "nvidia");
+  },
+  get geminiApiKey() {
+    return optional("GEMINI_API_KEY", "");
+  },
+  get embeddingsProvider() {
+    return optional("EMBEDDINGS_PROVIDER", "xenova");
+  },
   get voyageApiKey() {
-    return required("VOYAGE_API_KEY");
+    return optional("VOYAGE_API_KEY", "");
   },
 };

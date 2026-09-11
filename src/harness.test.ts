@@ -1,4 +1,6 @@
-import { test } from "node:test";
+import { after, test } from "node:test";
+import { closeCache } from "./cache.js";
+
 import assert from "node:assert/strict";
 import { runHarness } from "./harness.js";
 import type { ChatMessage, ChatResult, ToolSchema } from "./llm.js";
@@ -7,6 +9,8 @@ import { abrirTicketSchema, consultarStatusFaturaSchema } from "./tools.js";
 
 // Unit tests mock retrieval too — without this, runHarness falls back to the
 // real embed()/vectra index and these stop being fast, deterministic unit tests.
+after(closeCache);
+
 const mockRetrieve = async (_query: string): Promise<RetrievedChunk[]> => [];
 
 test("returns text directly when the LLM responds with final text", async () => {
@@ -107,7 +111,7 @@ test("LLM adapter sends the assistant tool call and matching result over the SDK
     });
     return Response.json({ choices: [{ message: { role: "assistant", content: "Sua fatura está paga." } }] });
   });
-  assert.equal(await runHarness("invoice-sdk", "Minha fatura fat_202509 já foi paga?", undefined, mockRetrieve), "Sua fatura está paga.");
+  assert.equal(await runHarness("invoice-sdk", `Minha fatura fat_202509 já foi paga? ${crypto.randomUUID()}`, undefined, mockRetrieve), "Sua fatura está paga.");
   assert.equal(calls, 2);
 });
 
