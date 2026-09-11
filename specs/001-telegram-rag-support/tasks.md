@@ -189,7 +189,7 @@ Task: "Popular data/docs/pix-bacen|faturamento-conectanet (T015)"
 1. Completar Phase 1 (Setup) e Phase 2 (Foundational)
 2. Completar Phase 3 (US1)
 3. **Parar e validar**: rodar `quickstart.md` → US1 isoladamente
-4. Já é demonstrável como "bot RAG" — ponto natural para mostrar pro amigo
+4. Já é demonstrável como "bot RAG" completo, ponto natural pra já mostrar o projeto
 
 ### Incremental Delivery
 

@@ -31,9 +31,9 @@
 
 ## Notes
 
-- Spec cobre as 3 entregas incrementais do `docs/plano.md` (MVP RAG puro →
-  v2 tool de status → v3 tool de ticket + multi-turno) como User Stories
-  P1/P2/P3, cada uma independentemente testável/demonstrável.
+- Spec cobre as 3 entregas incrementais planejadas (MVP RAG puro → v2 tool
+  de status → v3 tool de ticket + multi-turno) como User Stories P1/P2/P3,
+  cada uma independentemente testável/demonstrável.
 - Nenhum marcador [NEEDS CLARIFICATION]: decisões de escopo (dados
   simulados, sem autenticação, um usuário por chat) já estavam implícitas no
   plano prévio e foram documentadas em Assumptions.

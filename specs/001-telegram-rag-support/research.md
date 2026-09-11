@@ -1,10 +1,10 @@
-# Phase 0 Research: Agente de Suporte Fintech via Telegram
+# Phase 0 Research: Bot de Atendimento Financeiro via Telegram
 
 Nenhum item do Technical Context ficou marcado como `NEEDS CLARIFICATION` —
-as decisões de stack já vinham definidas em `docs/plano.md` a partir de
-conversa prévia com o usuário. Este documento registra a decisão e as
-alternativas consideradas para cada escolha, para referência futura (e para
-poder justificar cada uma delas numa entrevista).
+as decisões de stack já haviam sido tomadas antes deste documento. Este
+documento registra a decisão e as alternativas consideradas para cada
+escolha, para referência futura (e para poder justificar cada uma delas numa
+entrevista).
 
 ## Canal de mensagens: Telegram (via `grammy`)
 
@@ -18,20 +18,17 @@ poder justificar cada uma delas numa entrevista).
   - WhatsApp Cloud API (oficial) — exige verificação de negócio Meta e
     número dedicado, não é gratuita/imediata.
   - `whatsapp-web.js` (não-oficial) — grátis, mas usa engenharia reversa do
-    WhatsApp Web; risco real de ban do número. Descartado também por
-    proximidade indevida com trabalho confidencial de terceiro (ver
-    `docs/plano.md`).
+    WhatsApp Web; risco real de ban do número.
 
 ## LLM: NVIDIA NIM free tier
 
-- **Decision**: endpoint OpenAI-compatible da NVIDIA (`integrate.api.nvidia.com/v1`),
-  reaproveitando a mesma chave/padrão já em uso no projeto irmão `pac-mentor`.
+- **Decision**: endpoint OpenAI-compatible da NVIDIA (`integrate.api.nvidia.com/v1`).
 - **Rationale**: free tier com créditos e rate limit generoso para uso de
   laboratório, SDK `openai` padrão (sem cliente proprietário), suporta
   tool-calling — necessário para o harness decidir entre RAG e ação.
 - **Alternatives considered**: Groq free tier, Google Gemini free tier —
-  ambos viáveis, mas NVIDIA já está validado e em uso ativo em outro projeto
-  do usuário, reduzindo setup novo.
+  ambos viáveis; NVIDIA foi escolhida por já ter um padrão de integração
+  validado e testado previamente, reduzindo setup novo.
 
 ## Embeddings: `@xenova/transformers` (local)
 
@@ -47,14 +44,14 @@ poder justificar cada uma delas numa entrevista).
 ## Vector store: `vectra` (arquivo local)
 
 - **Decision**: índice vetorial em arquivo local via `vectra`.
-- **Rationale**: corpus é pequeno (dezenas de chunks de 3 fontes); um
+- **Rationale**: corpus é pequeno (dezenas de chunks de 2 fontes); um
   arquivo local resolve sem precisar de Postgres/pgvector ou outro serviço
   hospedado — alinhado ao princípio de stack zero-custo e à escala real do
   projeto (rung 6/7 do ponytail: a solução mais simples que funciona).
-- **Alternatives considered**: pgvector num Postgres gerenciado (ex.: Neon,
-  já usado no `pac-mentor`) — infraestrutura real, mas desnecessária para o
-  volume de dados deste lab; guardado como upgrade path caso o corpus
-  cresça muito além do que um índice em arquivo aguenta bem.
+- **Alternatives considered**: pgvector num Postgres gerenciado (ex.: Neon) —
+  infraestrutura real, mas desnecessária para o volume de dados deste lab;
+  guardado como upgrade path caso o corpus cresça muito além do que um
+  índice em arquivo aguenta bem.
 
 ## Teste: `node:test` + `node:assert` nativos
 
@@ -62,6 +59,5 @@ poder justificar cada uma delas numa entrevista).
   sem Jest/Vitest.
 - **Rationale**: constitution exige só "teste mínimo para lógica
   não-trivial" — o runner nativo já cobre isso sem dependência nova.
-- **Alternatives considered**: Vitest (usado em outros projetos do usuário,
-  ex. `inside-my-mind`) — mais recursos, mas dependência extra
-  injustificada para um punhado de testes `assert`-based.
+- **Alternatives considered**: Vitest/Jest — mais recursos, mas dependência
+  extra injustificada para um punhado de testes `assert`-based.

@@ -9,8 +9,8 @@ peça.
 - Node.js 20+
 - Um bot criado no Telegram via [@BotFather](https://t.me/BotFather), com o
   token salvo em `.env` (`TELEGRAM_BOT_TOKEN`)
-- Chave da NVIDIA NIM em `.env` (`NVIDIA_API_KEY`) — mesma usada no
-  `pac-mentor`
+- Chave da NVIDIA NIM em `.env` (`NVIDIA_API_KEY`) — obtida em
+  [build.nvidia.com](https://build.nvidia.com)
 - Pelo menos um documento em `data/docs/pix-bacen/` e em
   `data/docs/faturamento-conectanet/`
 

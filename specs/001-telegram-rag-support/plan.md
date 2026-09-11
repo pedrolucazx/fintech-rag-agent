@@ -87,7 +87,7 @@ src/
 ├── rag.test.ts        # teste mínimo de retrieval (pergunta conhecida → chunk esperado)
 ├── tools.ts           # schema + execução de consultar_status_transacao e abrir_ticket
 ├── tools.test.ts       # teste mínimo de cada tool mockada
-└── llm.ts             # client NVIDIA NIM (mesmo padrão usado no projeto pac-mentor)
+└── llm.ts             # client NVIDIA NIM (SDK openai apontado pro endpoint da NVIDIA)
 
 data/
 ├── docs/

@@ -1,14 +1,15 @@
 <!--
 Sync Impact Report
-- Version change: 1.0.0 → 1.1.0
-- Modified principles: IV. RAG Multi-Fonte com Proveniência (exemplo de fontes trocado de Bacen/Celcoin/Stripe para Bacen/PIX + FAQ de faturamento — persona virou cliente final, não desenvolvedor de integração)
-- Added sections: "Persona e Domínio do Produto" (dentro de Stack e Escopo Técnico)
+- Version change: 1.1.0 → 1.1.1
+- Modified principles: none (clarificação de redação, sem mudança de conteúdo normativo)
+- Added sections: none
 - Removed sections: none
+- Other changes: removidas referências a `docs/plano.md` (documento pessoal
+  removido do repo — não pertence a um repositório de projeto) e ao nome do
+  projeto irmão `pac-mentor`; motivos/decisões que só existiam lá agora
+  vivem inline neste documento e em `research.md`
 - Templates requiring updates:
-  - ✅ .specify/templates/plan-template.md (generic, no changes needed)
-  - ✅ .specify/templates/spec-template.md (generic, no changes needed)
-  - ✅ .specify/templates/tasks-template.md (generic, no changes needed)
-  - ✅ specs/001-telegram-rag-support/ (spec, plan, data-model, contracts, tasks reescritos na mesma mudança)
+  - ✅ specs/001-telegram-rag-support/ (research.md, plan.md, quickstart.md, tasks.md, checklists/requirements.md ajustados na mesma limpeza)
 - Follow-up TODOs: none
 -->
 
@@ -77,15 +78,15 @@ projeto de produção.
 ## Stack e Escopo Técnico
 
 Node.js + TypeScript. Telegram via `grammy`. LLM via NVIDIA NIM (endpoint
-OpenAI-compatible, key `nvapi-` já em uso no projeto irmão `pac-mentor`).
-Embeddings via `@xenova/transformers` (local, sem custo de API). Vector store
-via `vectra` (arquivo local). Corpus inicial: regulamento público PIX/Bacen +
-FAQ de faturamento de uma operadora de telecom fictícia ("ConectaNet"),
-organizados em `data/docs/<fonte>/`. Tools mockadas (sem integração externa
-real): `consultar_status_fatura`, `abrir_ticket`. Fora de escopo: WhatsApp
-(ver `docs/plano.md` para o motivo — risco de ban e proximidade indevida com
-trabalho confidencial de terceiro), qualquer framework de agente pronto,
-deploy hospedado.
+OpenAI-compatible, key `nvapi-`). Embeddings via `@xenova/transformers`
+(local, sem custo de API). Vector store via `vectra` (arquivo local). Corpus
+inicial: regulamento público PIX/Bacen + FAQ de faturamento de uma operadora
+de telecom fictícia ("ConectaNet"), organizados em `data/docs/<fonte>/`.
+Tools mockadas (sem integração externa real): `consultar_status_fatura`,
+`abrir_ticket`. Fora de escopo: WhatsApp (a alternativa não-oficial exige
+engenharia reversa do WhatsApp Web e corre risco de ban do número — Telegram
+Bot API é gratuita e não exige aprovação de negócio, ver `research.md`),
+qualquer framework de agente pronto, deploy hospedado.
 
 ## Persona e Domínio do Produto
 
@@ -111,7 +112,8 @@ feature) → `/speckit-plan` (plano técnico) → `/speckit-tasks` (quebra em
 tasks executáveis) → `/speckit-implement` (execução). Escopo incremental em
 três entregas demonstráveis independentemente: MVP (RAG puro) → v2 (+ tool
 `consultar_status_fatura`) → v3 (+ tool `abrir_ticket` + loop
-multi-turno completo) — ver `docs/plano.md`.
+multi-turno completo) — ver `specs/001-telegram-rag-support/tasks.md`
+(Implementation Strategy).
 
 Commits em português, sem co-autoria da IA (nenhuma linha `Co-Authored-By:
 Claude` ou equivalente). Repositório privado no GitHub
@@ -129,4 +131,4 @@ material, PATCH para clarificação/redação. Specs e plans gerados pelo
 `/speckit-plan` devem incluir uma checagem explícita de conformidade com os
 Core Principles antes de avançar para tasks.
 
-**Version**: 1.1.0 | **Ratified**: 2026-09-10 | **Last Amended**: 2026-09-10
+**Version**: 1.1.1 | **Ratified**: 2026-09-10 | **Last Amended**: 2026-09-11
