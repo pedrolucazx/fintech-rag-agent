@@ -2,11 +2,16 @@ import OpenAI from "openai";
 import { config } from "./config.js";
 import { getOrSet } from "./cache.js";
 import { log } from "./logger.js";
+import type { ConversationTurn } from "./history.js";
 
-export type ChatMessage = { role: "system" | "user" | "assistant" | "tool"; content: string };
+export type ChatMessage = {
+  role: "system" | "user" | "assistant" | "tool";
+  content: string;
+  toolCall?: ConversationTurn["toolCall"];
+};
 export type ToolSchema = { name: string; description: string; parameters: Record<string, unknown> };
 export type ChatResult =
-  | { type: "tool_call"; name: string; args: Record<string, unknown> }
+  | { type: "tool_call"; id?: string; name: string; args: Record<string, unknown> }
   | { type: "text"; content: string };
 
 const NVIDIA_MODEL = "meta/llama-3.1-8b-instruct";
@@ -77,8 +82,23 @@ async function callLlm(messages: ChatMessage[], tools: ToolSchema[]): Promise<Ch
     client.chat.completions.create(
       {
         model,
-        messages: messages as OpenAI.Chat.ChatCompletionMessageParam[],
+        messages: messages.map(({ role, content, toolCall }): OpenAI.Chat.ChatCompletionMessageParam => {
+          if (role === "tool") {
+            if (!toolCall?.id) throw new Error("Missing tool call id");
+            return { role, content, tool_call_id: toolCall.id };
+          }
+          if (role === "assistant" && toolCall) {
+            if (!toolCall.id) throw new Error("Missing tool call id");
+            return { role, content, tool_calls: [{
+              id: toolCall.id,
+              type: "function",
+              function: { name: toolCall.name, arguments: JSON.stringify(toolCall.args) },
+            }] };
+          }
+          return { role, content };
+        }),
         tools: tools.length > 0 ? tools.map(toOpenAiTool) : undefined,
+        parallel_tool_calls: tools.length > 0 ? false : undefined,
       },
       { timeout: TIMEOUT_MS },
     );
@@ -94,10 +114,20 @@ async function callLlm(messages: ChatMessage[], tools: ToolSchema[]): Promise<Ch
   const choice = response.choices[0];
   const toolCall = choice.message.tool_calls?.[0];
   if (toolCall && "function" in toolCall) {
+    let args: Record<string, unknown> = {};
+    try {
+      args = JSON.parse(toolCall.function.arguments || "{}");
+    } catch (err) {
+      log.warn("tool call arguments were not valid JSON, treating as empty", {
+        name: toolCall.function.name,
+        err: String(err),
+      });
+    }
     return {
       type: "tool_call",
+      id: toolCall.id,
       name: toolCall.function.name,
-      args: JSON.parse(toolCall.function.arguments || "{}"),
+      args,
     };
   }
   return { type: "text", content: choice.message.content ?? "" };

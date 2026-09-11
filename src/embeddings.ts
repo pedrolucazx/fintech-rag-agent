@@ -1,52 +1,66 @@
+import { pipeline } from "@xenova/transformers";
 import { config } from "./config.js";
+import { log } from "./logger.js";
 
-export async function embed(text: string): Promise<number[]> {
-  const provider = config.embeddingsProvider;
+const EMBEDDING_MODEL = "Xenova/all-MiniLM-L6-v2";
+const TIMEOUT_MS = 15_000;
 
-  if (provider === "voyage") {
-    if (!config.voyageApiKey) {
-      throw new Error("VOYAGE_API_KEY is required when EMBEDDINGS_PROVIDER=voyage (see .env.example)");
-    }
-    return embedVoyage(text);
+type Extractor = Awaited<ReturnType<typeof pipeline<"feature-extraction">>>;
+let extractorPromise: Promise<Extractor> | undefined;
+
+function getExtractor(): Promise<Extractor> {
+  if (!extractorPromise) {
+    extractorPromise = pipeline("feature-extraction", EMBEDDING_MODEL);
   }
-
-  return embedXenova(text);
-}
-
-// Cache the in-flight Promise, not the resolved value — caching the value
-// leaves a window between the "not loaded yet" check and the await where two
-// concurrent embed() calls both start loading the model.
-let extractorPromise: ReturnType<typeof loadExtractor> | undefined;
-async function loadExtractor() {
-  const { pipeline } = await import("@xenova/transformers");
-  return pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2");
-}
-
-async function embedXenova(text: string): Promise<number[]> {
-  if (!extractorPromise) extractorPromise = loadExtractor();
-  const embedder = await extractorPromise;
-  const output = await embedder(text, { pooling: "mean", normalize: true });
-  return Array.from(output.data) as number[];
+  return extractorPromise;
 }
 
 async function embedVoyage(text: string): Promise<number[]> {
-  const response = await fetch("https://api.voyageai.com/v1/embeddings", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${config.voyageApiKey}`,
-    },
-    body: JSON.stringify({
-      model: "voyage-3",
-      input: [text],
-    }),
-  });
+  if (!config.voyageApiKey) throw new Error("VOYAGE_API_KEY is required when EMBEDDINGS_PROVIDER=voyage");
+  const call = () =>
+    fetch("https://api.voyageai.com/v1/embeddings", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${config.voyageApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ model: "voyage-3", input: [text] }),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
 
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Voyage API error: ${response.status} ${error}`);
+  let response;
+  try {
+    response = await call();
+  } catch (err) {
+    log.warn("voyage embeddings call failed, retrying once", { err: String(err) });
+    response = await call();
   }
 
-  const data = await response.json() as { data: Array<{ embedding: number[] }> };
+  if (!response.ok) {
+    throw new Error(`Voyage AI embeddings request failed: ${response.status} ${await response.text()}`);
+  }
+
+  const data = (await response.json()) as { data: { embedding: number[] }[] };
   return data.data[0].embedding;
+}
+
+/** Provider selected via `EMBEDDINGS_PROVIDER` ("xenova" default, or "voyage"). */
+export function currentEmbeddingsProvider(): string {
+  return config.embeddingsProvider.toLowerCase();
+}
+
+/**
+ * Embed a piece of text using the selected provider (`EMBEDDINGS_PROVIDER`):
+ * "xenova" (default, local) or "voyage" (remote, `VOYAGE_API_KEY`).
+ */
+export async function embed(text: string): Promise<number[]> {
+  const provider = currentEmbeddingsProvider();
+
+  if (provider === "voyage") {
+    return embedVoyage(text);
+  }
+
+  const model = await getExtractor();
+  const output = await model(text, { pooling: "mean", normalize: true });
+  return Array.from(output.data as Float32Array);
 }

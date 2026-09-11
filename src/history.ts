@@ -1,7 +1,7 @@
 export type ConversationTurn = {
   role: "user" | "assistant" | "tool";
   content: string;
-  toolCall: { name: string; args: Record<string, unknown> } | null;
+  toolCall: { id?: string; name: string; args: Record<string, unknown> } | null;
   timestamp: number;
 };
 
