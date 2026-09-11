@@ -25,6 +25,7 @@ function getNvidiaClient(): OpenAI {
     nvidiaClient = new OpenAI({
       baseURL: "https://integrate.api.nvidia.com/v1",
       apiKey: config.nvidiaApiKey,
+      maxRetries: 1,
     });
   }
   return nvidiaClient;
@@ -38,6 +39,7 @@ function getGeminiClient(): OpenAI {
     geminiClient = new OpenAI({
       baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
       apiKey: config.geminiApiKey,
+      maxRetries: 1,
     });
   }
   return geminiClient;
@@ -51,11 +53,19 @@ function getModel(): string {
   return config.llmProvider === "gemini" ? config.geminiModel : config.nvidiaModel;
 }
 
-function toOpenAiTool(tool: ToolSchema) {
-  return {
-    type: "function" as const,
-    function: { name: tool.name, description: tool.description, parameters: tool.parameters },
-  };
+const openAiToolCache = new Map<string, OpenAI.Chat.ChatCompletionTool>();
+
+function toOpenAiTool(tool: ToolSchema): OpenAI.Chat.ChatCompletionTool {
+  const key = tool.name;
+  let cached = openAiToolCache.get(key);
+  if (!cached) {
+    cached = {
+      type: "function",
+      function: { name: tool.name, description: tool.description, parameters: tool.parameters },
+    };
+    openAiToolCache.set(key, cached);
+  }
+  return cached;
 }
 
 // ponytail: keyed on message/tool content only, no chatId — two different
@@ -76,38 +86,29 @@ async function callLlm(messages: ChatMessage[], tools: ToolSchema[]): Promise<Ch
   const client = getClient();
   const model = getModel();
 
-  const call = () =>
-    client.chat.completions.create(
-      {
-        model,
-        messages: messages.map(({ role, content, toolCall }): OpenAI.Chat.ChatCompletionMessageParam => {
-          if (role === "tool") {
-            if (!toolCall?.id) throw new Error("Missing tool call id");
-            return { role, content, tool_call_id: toolCall.id };
-          }
-          if (role === "assistant" && toolCall) {
-            if (!toolCall.id) throw new Error("Missing tool call id");
-            return { role, content, tool_calls: [{
-              id: toolCall.id,
-              type: "function",
-              function: { name: toolCall.name, arguments: JSON.stringify(toolCall.args) },
-            }] };
-          }
-          return { role, content };
-        }),
-        tools: tools.length > 0 ? tools.map(toOpenAiTool) : undefined,
-        parallel_tool_calls: tools.length > 0 ? false : undefined,
-      },
-      { timeout: TIMEOUT_MS },
-    );
-
-  let response;
-  try {
-    response = await call();
-  } catch (err) {
-    log.warn("llm call failed, retrying once", { err: String(err), provider: config.llmProvider });
-    response = await call();
-  }
+  const response = await client.chat.completions.create(
+    {
+      model,
+      messages: messages.map(({ role, content, toolCall }): OpenAI.Chat.ChatCompletionMessageParam => {
+        if (role === "tool") {
+          if (!toolCall?.id) throw new Error("Missing tool call id");
+          return { role, content, tool_call_id: toolCall.id };
+        }
+        if (role === "assistant" && toolCall) {
+          if (!toolCall.id) throw new Error("Missing tool call id");
+          return { role, content, tool_calls: [{
+            id: toolCall.id,
+            type: "function",
+            function: { name: toolCall.name, arguments: JSON.stringify(toolCall.args) },
+          }] };
+        }
+        return { role, content };
+      }),
+      tools: tools.length > 0 ? tools.map(toOpenAiTool) : undefined,
+      parallel_tool_calls: tools.length > 0 ? false : undefined,
+    },
+    { timeout: TIMEOUT_MS },
+  );
 
   const choice = response.choices[0];
   const toolCall = choice.message.tool_calls?.[0];

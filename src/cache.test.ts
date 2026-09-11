@@ -13,11 +13,6 @@ describe("cache.ts — Redis cache behavior", () => {
     return { value: callCount };
   };
 
-  before(async () => {
-    // Ensure Redis is reachable by doing a quick operation
-    await getOrSet("cache:health", 1000, async () => ({ ok: true }));
-  });
-
   after(async () => {
     await closeCache();
   });
