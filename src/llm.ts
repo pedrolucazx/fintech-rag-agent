@@ -71,11 +71,20 @@ export async function chat(messages: ChatMessage[], tools: ToolSchema[]): Promis
   const choice = response.choices[0];
   const toolCall = choice.message.tool_calls?.[0];
   if (toolCall && "function" in toolCall) {
+    let args: Record<string, unknown> = {};
+    try {
+      args = JSON.parse(toolCall.function.arguments || "{}");
+    } catch (err) {
+      log.warn("tool call arguments were not valid JSON, treating as empty", {
+        name: toolCall.function.name,
+        err: String(err),
+      });
+    }
     return {
       type: "tool_call",
       id: toolCall.id,
       name: toolCall.function.name,
-      args: JSON.parse(toolCall.function.arguments || "{}"),
+      args,
     };
   }
   return { type: "text", content: choice.message.content ?? "" };
