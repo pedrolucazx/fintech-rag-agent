@@ -29,7 +29,7 @@ Telegram).
 | `chatId` | string | Identificador do chat do Telegram — chave de sessão |
 | `role` | `"user" \| "assistant" \| "tool"` | Papel da mensagem no histórico enviado ao LLM |
 | `content` | string | Conteúdo da mensagem (texto do usuário, resposta do modelo, ou resultado de uma tool) |
-| `toolCall` | `{ name: string; args: object } \| null` | Presente quando `role` é `"assistant"` e o LLM decidiu chamar uma tool |
+| `toolCall` | `{ id?: string; name: string; args: object } \| null` | Presente na chamada do `assistant` e no resultado `tool`; `id` correlaciona ambos no protocolo do provider |
 | `timestamp` | number | Momento da mensagem, usado para ordenar o histórico |
 
 **Relationships**: várias `ConversationTurn` pertencem a um `chatId` (1
