@@ -1,75 +1,62 @@
 import { pipeline } from "@xenova/transformers";
+import { config } from "./config.js";
+import { log } from "./logger.js";
 
-/**
- * Provider for text embeddings.
- * - "xenova": local embeddings using @xenova/transformers (default).
- * - "voyage": remote embeddings via Voyage AI API.
- */
-const DEFAULT_PROVIDER = "xenova";
-
-// Model name used for the Xenova provider.
 const EMBEDDING_MODEL = "Xenova/all-MiniLM-L6-v2";
+const TIMEOUT_MS = 15_000;
 
 type Extractor = Awaited<ReturnType<typeof pipeline<"feature-extraction">>>;
-let extractor: Extractor | undefined;
+let extractorPromise: Promise<Extractor> | undefined;
 
-/**
- * Lazily creates (or reuses) the Xenova feature‑extraction pipeline.
- */
-async function getExtractor(): Promise<Extractor> {
-  if (!extractor) {
-    extractor = await pipeline("feature-extraction", EMBEDDING_MODEL);
+function getExtractor(): Promise<Extractor> {
+  if (!extractorPromise) {
+    extractorPromise = pipeline("feature-extraction", EMBEDDING_MODEL);
   }
-  return extractor;
+  return extractorPromise;
 }
 
-/**
- * Voyage AI response shape (partial).
- */
-interface VoyageResponse {
-  data?: { embedding: number[] }[];
-  embedding?: number[];
-  [key: string]: any;
-}
-
-/**
- * Embed a piece of text using the selected provider.
- *
- * The provider is chosen via the `EMBEDDINGS_PROVIDER` environment variable:
- *   - "xenova" (default) – runs locally with @xenova/transformers.
- *   - "voyage" – calls the Voyage AI embeddings endpoint.
- */
-export async function embed(text: string): Promise<number[]> {
-  const provider = (process.env.EMBEDDINGS_PROVIDER ?? DEFAULT_PROVIDER).toLowerCase();
-
-  if (provider === "voyage") {
-    const apiKey = process.env.VOYAGE_API_KEY;
-    if (!apiKey) {
-      throw new Error("Missing required env var: VOYAGE_API_KEY (see .env.example)");
-    }
-
-    const response = await fetch("https://api.voyageai.com/v1/embeddings", {
+async function embedVoyage(text: string): Promise<number[]> {
+  const call = () =>
+    fetch("https://api.voyageai.com/v1/embeddings", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${apiKey}`,
+        Authorization: `Bearer ${config.voyageApiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ input: text }),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
     });
 
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`Voyage AI embeddings request failed: ${response.status} ${errText}`);
-    }
+  let response;
+  try {
+    response = await call();
+  } catch (err) {
+    log.warn("voyage embeddings call failed, retrying once", { err: String(err) });
+    response = await call();
+  }
 
-    const data = (await response.json()) as VoyageResponse;
-    if (Array.isArray(data?.data?.[0]?.embedding)) {
-      return data.data[0].embedding;
-    }
-    if (Array.isArray(data?.embedding)) {
-      return data.embedding;
-    }
-    throw new Error("Unexpected Voyage AI response format for embeddings");
+  if (!response.ok) {
+    throw new Error(`Voyage AI embeddings request failed: ${response.status} ${await response.text()}`);
+  }
+
+  const data = (await response.json()) as { data: { embedding: number[] }[] };
+  return data.data[0].embedding;
+}
+
+/** Provider selected via `EMBEDDINGS_PROVIDER` ("xenova" default, or "voyage"). */
+export function currentEmbeddingsProvider(): string {
+  return (process.env.EMBEDDINGS_PROVIDER ?? "xenova").toLowerCase();
+}
+
+/**
+ * Embed a piece of text using the selected provider (`EMBEDDINGS_PROVIDER`):
+ * "xenova" (default, local) or "voyage" (remote, `VOYAGE_API_KEY`).
+ */
+export async function embed(text: string): Promise<number[]> {
+  const provider = currentEmbeddingsProvider();
+
+  if (provider === "voyage") {
+    return embedVoyage(text);
   }
 
   const model = await getExtractor();

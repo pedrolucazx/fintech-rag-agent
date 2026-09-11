@@ -19,4 +19,7 @@ export const config = {
   get nvidiaApiKey() {
     return required("NVIDIA_API_KEY");
   },
+  get voyageApiKey() {
+    return required("VOYAGE_API_KEY");
+  },
 };
