@@ -1,11 +1,16 @@
 import OpenAI from "openai";
 import { config } from "./config.js";
 import { log } from "./logger.js";
+import type { ConversationTurn } from "./history.js";
 
-export type ChatMessage = { role: "system" | "user" | "assistant" | "tool"; content: string };
+export type ChatMessage = {
+  role: "system" | "user" | "assistant" | "tool";
+  content: string;
+  toolCall?: ConversationTurn["toolCall"];
+};
 export type ToolSchema = { name: string; description: string; parameters: Record<string, unknown> };
 export type ChatResult =
-  | { type: "tool_call"; name: string; args: Record<string, unknown> }
+  | { type: "tool_call"; id?: string; name: string; args: Record<string, unknown> }
   | { type: "text"; content: string };
 
 const MODEL = "meta/llama-3.1-8b-instruct";
@@ -34,8 +39,22 @@ export async function chat(messages: ChatMessage[], tools: ToolSchema[]): Promis
     getClient().chat.completions.create(
       {
         model: MODEL,
-        messages: messages as OpenAI.Chat.ChatCompletionMessageParam[],
+        messages: messages.map(({ role, content, toolCall }): OpenAI.Chat.ChatCompletionMessageParam => {
+          if (role === "tool") {
+            if (!toolCall?.id) throw new Error("Missing tool call id");
+            return { role, content, tool_call_id: toolCall.id };
+          }
+          if (role === "assistant" && toolCall?.id) {
+            return { role, content, tool_calls: [{
+              id: toolCall.id,
+              type: "function",
+              function: { name: toolCall.name, arguments: JSON.stringify(toolCall.args) },
+            }] };
+          }
+          return { role, content };
+        }),
         tools: tools.length > 0 ? tools.map(toOpenAiTool) : undefined,
+        parallel_tool_calls: tools.length > 0 ? false : undefined,
       },
       { timeout: TIMEOUT_MS },
     );
@@ -53,6 +72,7 @@ export async function chat(messages: ChatMessage[], tools: ToolSchema[]): Promis
   if (toolCall && "function" in toolCall) {
     return {
       type: "tool_call",
+      id: toolCall.id,
       name: toolCall.function.name,
       args: JSON.parse(toolCall.function.arguments || "{}"),
     };

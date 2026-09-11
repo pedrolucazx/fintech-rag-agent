@@ -95,13 +95,13 @@ inexistente, e sem informar o id — ver `quickstart.md` → US2.
 
 ### Tests for User Story 2
 
-- [ ] T020 [P] [US2] Teste da tool `consultar_status_fatura`: id existente → status/valor/vencimento correspondentes, id inexistente → `nao_encontrado` (per contracts/tools.md) em `src/tools.test.ts`
+- [x] T020 [P] [US2] Teste da tool `consultar_status_fatura`: id existente → status/valor/vencimento correspondentes, id inexistente → `nao_encontrado` (per contracts/tools.md) em `src/tools.test.ts`
 
 ### Implementation for User Story 2
 
-- [ ] T021 [P] [US2] Implementar schema + dados simulados + execução de `consultar_status_fatura` em `src/tools.ts` (per contracts/tools.md e data-model.md → SimulatedInvoice)
-- [ ] T022 [US2] Registrar a tool no harness: `src/harness.ts` passa o schema ao LLM na chamada, executa a função local quando o LLM retorna `tool_call`, injeta o resultado de volta no histórico e repete o loop
-- [ ] T023 [US2] Ajustar system prompt para pedir o identificador (ou mês de referência) quando o cliente perguntar status sem informá-lo (Acceptance Scenario 2 da US2)
+- [x] T021 [P] [US2] Implementar schema + dados simulados + execução de `consultar_status_fatura` em `src/tools.ts` (per contracts/tools.md e data-model.md → SimulatedInvoice)
+- [x] T022 [US2] Registrar a tool no harness: `src/harness.ts` passa o schema ao LLM na chamada, executa a função local quando o LLM retorna `tool_call`, injeta o resultado de volta no histórico e repete o loop
+- [x] T023 [US2] Ajustar system prompt para pedir o identificador (ou mês de referência) quando o cliente perguntar status sem informá-lo (Acceptance Scenario 2 da US2)
 - [ ] T024 [US2] Validação manual: rodar os 2 cenários de `quickstart.md` → US2
 
 **Checkpoint**: bot decide dinamicamente entre RAG e tool-call — demonstra a
