@@ -93,13 +93,19 @@ src/
 ├── bot.ts             # setup do grammy, long polling, roteamento de mensagem → harness
 ├── harness.ts          # o loop do agente: monta contexto → chama LLM → decide RAG/tool/resposta → repete
 ├── harness.test.ts      # teste mínimo do loop de decisão (mock de LLM)
-├── rag.ts               # chunking e retrieval (vectra) com metadado de fonte, usa embeddings.ts
+├── rag.ts               # chunking e retrieval (vectra) com metadado de fonte, usa providers/embeddings.ts
 ├── rag.test.ts           # teste mínimo de retrieval (pergunta conhecida → chunk esperado)
 ├── tools.ts              # schema + execução de consultar_status_fatura e abrir_ticket
 ├── tools.test.ts          # teste mínimo de cada tool mockada
-├── llm.ts                 # adapter de LLM: NVIDIA (default) + Gemini, via cache.ts
-├── embeddings.ts           # adapter de embeddings: Xenova (default) + Voyage AI
-└── cache.ts                # cache de resposta do LLM via Redis (ioredis, TTL nativo)
+├── config.ts              # carregamento de config/segredos
+├── history.ts             # histórico de conversa em memória
+├── logger.ts              # logger estruturado leve
+└── providers/             # adapters trocáveis (Constitution Principle VII)
+    ├── llm.ts               # adapter de LLM: NVIDIA (default) + Gemini, via cache.ts
+    ├── llm.test.ts
+    ├── embeddings.ts         # adapter de embeddings: Xenova (default) + Voyage AI
+    ├── cache.ts              # cache de resposta do LLM via Redis (ioredis, TTL nativo)
+    └── cache.test.ts
 
 data/
 ├── docs/
@@ -114,14 +120,18 @@ scripts/
 docker-compose.yml        # 1 serviço: redis:alpine, só pro cache (Constitution Principle V/VII)
 ```
 
-**Structure Decision**: Projeto único (sem frontend/mobile), estrutura plana
-em `src/` — módulos funcionais + entrypoint do bot, testes colocados junto
-ao módulo que testam (evita árvore `tests/` paralela para um projeto deste
-tamanho). `llm.ts` e `embeddings.ts` são adapters de provider (Constitution
-Principle VII) — `rag.ts` e `scripts/ingest.ts` chamam `embeddings.ts`, não
-implementam embedding diretamente. Corpus e índice ficam fora de `src/` em
-`data/`, com um script de ingest separado do runtime do bot (ingestão é um
-passo offline, não parte do loop do harness).
+**Structure Decision**: Projeto único (sem frontend/mobile). `src/` agrupa
+por camada: módulos de domínio/orquestração (`bot.ts`, `harness.ts`,
+`rag.ts`, `tools.ts`) e infra (`config.ts`, `history.ts`, `logger.ts`) na
+raiz; adapters trocáveis (`llm.ts`, `embeddings.ts`, `cache.ts`) em
+`src/providers/` — são a mesma categoria de peça (Constitution Principle
+VII: implementação real por trás de uma interface mínima, sem registry
+especulativo), então ficam juntos. Testes colocados junto ao módulo que
+testam (evita árvore `tests/` paralela). `rag.ts` e `scripts/ingest.ts`
+chamam `providers/embeddings.ts`, não implementam embedding diretamente.
+Corpus e índice ficam fora de `src/` em `data/`, com um script de ingest
+separado do runtime do bot (ingestão é um passo offline, não parte do loop
+do harness).
 
 ## Complexity Tracking
 

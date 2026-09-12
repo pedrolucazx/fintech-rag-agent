@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { chat, type ChatMessage, type ChatResult, type ToolSchema } from "./llm.js";
+import { chat, type ChatMessage, type ChatResult, type ToolSchema } from "./providers/llm.js";
 import { history } from "./history.js";
 import { log } from "./logger.js";
 import {

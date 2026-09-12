@@ -5,7 +5,7 @@ pública, mas são um limite de contrato real dentro do código: qualquer
 provider novo implementa a mesma assinatura, sem o resto do projeto saber
 qual está ativo.
 
-## LLM (`src/llm.ts`)
+## LLM (`src/providers/llm.ts`)
 
 ```ts
 type ChatMessage = {
@@ -45,7 +45,7 @@ function chat(messages: ChatMessage[], tools: ToolSchema[]): Promise<ChatResult>
 - Timeout + 1 retry em erro transitório, por provider (ver contracts/tools.md
   → mesma filosofia de erro tratado, não propagado cru).
 
-## Embeddings (`src/embeddings.ts`)
+## Embeddings (`src/providers/embeddings.ts`)
 
 ```ts
 function embed(text: string): Promise<number[]>;
@@ -67,7 +67,7 @@ function embed(text: string): Promise<number[]>;
   suficiente pra não valer a complexidade — o cache que importa é o de
   `llm.ts`).
 
-## Cache (`src/cache.ts`)
+## Cache (`src/providers/cache.ts`)
 
 ```ts
 function getOrSet<T>(key: string, ttlMs: number, fn: () => Promise<T>): Promise<T>;

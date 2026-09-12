@@ -1,6 +1,6 @@
 import { pipeline } from "@xenova/transformers";
-import { config } from "./config.js";
-import { log } from "./logger.js";
+import { config } from "../config.js";
+import { log } from "../logger.js";
 
 const EMBEDDING_MODEL = "Xenova/all-MiniLM-L6-v2";
 const TIMEOUT_MS = 15_000;
@@ -15,16 +15,16 @@ function getExtractor(): Promise<Extractor> {
   return extractorPromise;
 }
 
-async function embedVoyage(text: string): Promise<number[]> {
+async function callVoyageEmbeddings(input: string[]): Promise<number[][]> {
   if (!config.voyageApiKey) throw new Error("VOYAGE_API_KEY is required when EMBEDDINGS_PROVIDER=voyage");
   const call = () =>
-    fetch("https://api.voyageai.com/v1/embeddings", {
+    fetch("https://ai.mongodb.com/v1/embeddings", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${config.voyageApiKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ model: "voyage-3", input: [text] }),
+      body: JSON.stringify({ model: "voyage-finance-2", input }),
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
 
@@ -41,7 +41,12 @@ async function embedVoyage(text: string): Promise<number[]> {
   }
 
   const data = (await response.json()) as { data: { embedding: number[] }[] };
-  return data.data[0].embedding;
+  return data.data.map((d) => d.embedding);
+}
+
+async function embedVoyage(text: string): Promise<number[]> {
+  const [embedding] = await callVoyageEmbeddings([text]);
+  return embedding;
 }
 
 /** Provider selected via `EMBEDDINGS_PROVIDER` ("xenova" default, or "voyage"). */
@@ -63,4 +68,12 @@ export async function embed(text: string): Promise<number[]> {
   const model = await getExtractor();
   const output = await model(text, { pooling: "mean", normalize: true });
   return Array.from(output.data as Float32Array);
+}
+
+/** Batch-embed multiple texts. Voyage sends all in one request; Xenova processes sequentially. */
+export async function embedBatch(texts: string[]): Promise<number[][]> {
+  if (currentEmbeddingsProvider() === "voyage") {
+    return callVoyageEmbeddings(texts);
+  }
+  return Promise.all(texts.map(embed));
 }

@@ -45,7 +45,7 @@ integração Telegram↔LLM, sem RAG/tools ainda. Bloqueia todas as user stories
 
 - [x] T007 Implementar carregamento de config/segredos (lê `TELEGRAM_BOT_TOKEN`, `NVIDIA_API_KEY` de `.env`, falha com mensagem clara se faltar) em `src/config.ts`
 - [x] T008 [P] Implementar logger estruturado leve (sem dependência nova — `console` com prefixo/nível) em `src/logger.ts`
-- [x] T009 [P] Implementar client do LLM (NVIDIA NIM via SDK `openai`, timeout + 1 retry simples em erro transitório) em `src/llm.ts` — vira adapter multi-provider na Phase 7 (T037), implementar T009 já com a assinatura `chat(messages, tools)` de contracts/providers.md pra não retrabalhar
+- [x] T009 [P] Implementar client do LLM (NVIDIA NIM via SDK `openai`, timeout + 1 retry simples em erro transitório) em `src/providers/llm.ts` — vira adapter multi-provider na Phase 7 (T037), implementar T009 já com a assinatura `chat(messages, tools)` de contracts/providers.md pra não retrabalhar
 - [x] T010 [P] Implementar histórico de conversa em memória, chaveado por `chatId` (`ConversationTurn[]` — ver data-model.md) em `src/history.ts`
 - [x] T011 Implementar o loop do harness (`src/harness.ts`): monta mensagens (system + histórico), chama `llm.ts`, decide entre `tool_call` e resposta final, repete até resposta final — SEM tools/RAG registrados ainda (registro vazio, extensível nas fases seguintes)
 - [x] T012 Implementar `src/bot.ts`: setup do `grammy` em long polling, roteia cada mensagem recebida para `harness.ts` e responde com o texto final (depende de T007, T010, T011)
@@ -138,7 +138,7 @@ multi-turno.
 ## Phase 6: Polish & Cross-Cutting Concerns
 
 - [ ] T031 [P] Escrever `README.md` com setup resumido (link para `quickstart.md`)
-- [ ] T032 Revisar tratamento de erro/timeout nas chamadas ao LLM (`src/llm.ts`) e na execução de tools (`src/tools.ts`) — falha não deve derrubar o processo do bot (Constitution Principle V)
+- [ ] T032 Revisar tratamento de erro/timeout nas chamadas ao LLM (`src/providers/llm.ts`) e na execução de tools (`src/tools.ts`) — falha não deve derrubar o processo do bot (Constitution Principle V)
 - [ ] T033 Rodar `quickstart.md` de ponta a ponta (US1+US2+US3 na mesma sessão de conversa) antes de considerar a feature pronta
 - [x] T034 [P] Confirmar que `npm test` roda todos os `*.test.ts` e todos passam (24 testes passando)
 
@@ -226,10 +226,10 @@ o cache, nada do resto da infra do projeto-âncora fintech migra pra cá; ver
 tasks. Conceitualmente pertence à Foundational (Phase 2) — ver notas em
 T009/T016/T017 apontando pra cá.
 
-- [x] T035 Implementar cache genérico via Redis (`getOrSet(key, ttlMs, fn)`, client `ioredis`, TTL nativo `SET ... PX`) em `src/cache.ts` (depende de T042, T043)
+- [x] T035 Implementar cache genérico via Redis (`getOrSet(key, ttlMs, fn)`, client `ioredis`, TTL nativo `SET ... PX`) em `src/providers/cache.ts` (depende de T042, T043)
 - [x] T036 [P] Expandir `.env.example` (T005) com `LLM_PROVIDER`, `GEMINI_API_KEY`, `EMBEDDINGS_PROVIDER`, `VOYAGE_API_KEY` (todas opcionais, default pra NVIDIA/Xenova; Redis usa `redis://localhost:6379` fixo, sem env var — sempre local via `docker-compose.yml`, não precisa ser configurável)
-- [x] T037 Refatorar `src/llm.ts` pra adapter: `chat(messages, tools)` seleciona NVIDIA ou Gemini via `LLM_PROVIDER` (mesmo SDK `openai`, só troca `baseURL`/`apiKey`/`model` — ver contracts/providers.md), passando toda chamada por `cache.ts` (T035) antes de ir pra rede (depende de T035)
-- [x] T038 Criar `src/embeddings.ts`: `embed(text)` seleciona Xenova (default) ou Voyage AI via `EMBEDDINGS_PROVIDER` (Voyage por `fetch` nativo em `api.voyageai.com/v1/embeddings`); atualizar `scripts/ingest.ts` (T016) e `src/rag.ts` (T017) pra chamarem esse módulo em vez de usar Xenova direto
+- [x] T037 Refatorar `src/providers/llm.ts` pra adapter: `chat(messages, tools)` seleciona NVIDIA ou Gemini via `LLM_PROVIDER` (mesmo SDK `openai`, só troca `baseURL`/`apiKey`/`model` — ver contracts/providers.md), passando toda chamada por `cache.ts` (T035) antes de ir pra rede (depende de T035)
+- [x] T038 Criar `src/providers/embeddings.ts`: `embed(text)` seleciona Xenova (default) ou Voyage AI via `EMBEDDINGS_PROVIDER` (Voyage por `fetch` nativo em `api.voyageai.com/v1/embeddings`); atualizar `scripts/ingest.ts` (T016) e `src/rag.ts` (T017) pra chamarem esse módulo em vez de usar Xenova direto
 - [x] T039 Teste mínimo do cache em `src/cache.test.ts`, rodando contra o Redis real do `docker-compose.yml` (requer `docker compose up -d` antes de `npm test`): mesma chave dentro do TTL não rechama `fn`; chave diferente chama; chave expirada rechama (depende de T035)
 - [x] T040 [P] Teste mínimo da seleção de provider em `src/llm.test.ts` (ou ampliar `harness.test.ts`): `LLM_PROVIDER=nvidia` monta client com a config da NVIDIA, `LLM_PROVIDER=gemini` monta com a do Gemini — sem chamada de rede real (depende de T037)
 - [ ] T041 Validação manual: rodar o bot com `LLM_PROVIDER=gemini` (chave própria) e repetir 1 cenário de cada user story (US1/US2/US3) — confirma que a troca de provider funciona de verdade, não só no papel (depende de T037, T038)

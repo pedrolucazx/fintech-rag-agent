@@ -64,7 +64,7 @@ entrevista).
 
 ## LLM: adapter com NVIDIA (default) + Gemini
 
-- **Decision**: interface mínima `chat(messages, tools?)` em `src/llm.ts`,
+- **Decision**: interface mínima `chat(messages, tools?)` em `src/providers/llm.ts`,
   com dois providers reais: NVIDIA NIM (default) e Gemini, selecionáveis
   por `LLM_PROVIDER`. Gemini é acessado pelo mesmo SDK `openai` já em uso,
   só trocando `baseURL` pro endpoint OpenAI-compatible do Gemini
@@ -81,7 +81,7 @@ entrevista).
 
 ## Embeddings: adapter com Xenova (default, local) + Voyage AI (opcional)
 
-- **Decision**: interface mínima `embed(text)` em `src/embeddings.ts`, com
+- **Decision**: interface mínima `embed(text)` em `src/providers/embeddings.ts`, com
   `@xenova/transformers` como default local e Voyage AI como alternativa
   opcional (via `VOYAGE_API_KEY`), selecionável por `EMBEDDINGS_PROVIDER`.
   Voyage AI é chamado por `fetch` nativo direto em
@@ -96,7 +96,7 @@ entrevista).
 
 ## Cache: resposta do LLM via Redis (Docker local)
 
-- **Decision** *(revisado — ver histórico abaixo)*: cache em `src/cache.ts`
+- **Decision** *(revisado — ver histórico abaixo)*: cache em `src/providers/cache.ts`
   usando Redis (`ioredis`), chave = hash de `(provider, messages, tools)`,
   TTL nativo do Redis (`SET ... PX ttlMs`), subido via `docker-compose.yml`
   com um único serviço `redis:alpine`.

@@ -1,8 +1,8 @@
 import OpenAI from "openai";
-import { config } from "./config.js";
+import { config } from "../config.js";
 import { getOrSet } from "./cache.js";
-import { log } from "./logger.js";
-import type { ConversationTurn } from "./history.js";
+import { log } from "../logger.js";
+import type { ConversationTurn } from "../history.js";
 
 export type ChatMessage = {
   role: "system" | "user" | "assistant" | "tool";

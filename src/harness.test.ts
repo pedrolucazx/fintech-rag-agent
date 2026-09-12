@@ -1,9 +1,9 @@
 import { after, test } from "node:test";
-import { closeCache } from "./cache.js";
+import { closeCache } from "./providers/cache.js";
 
 import assert from "node:assert/strict";
 import { runHarness } from "./harness.js";
-import type { ChatMessage, ChatResult, ToolSchema } from "./llm.js";
+import type { ChatMessage, ChatResult, ToolSchema } from "./providers/llm.js";
 import type { RetrievedChunk } from "./rag.js";
 import { abrirTicketSchema, consultarStatusFaturaSchema } from "./tools.js";
 

@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { LocalIndex } from "vectra";
-import { embed, currentEmbeddingsProvider } from "./embeddings.js";
+import { embed, embedBatch, currentEmbeddingsProvider } from "./providers/embeddings.js";
 import { log } from "./logger.js";
 
 export type RetrievedChunk = {
@@ -100,10 +100,8 @@ export async function buildIndex(
     return { chunks: 0, sources: 0 };
   }
 
-  const items = [];
-  for (const chunk of chunks) {
-    items.push({ vector: await embed(chunk.text), metadata: chunk });
-  }
+  const embeddings = await embedBatch(chunks.map((c) => c.text));
+  const items = chunks.map((chunk, i) => ({ vector: embeddings[i], metadata: chunk }));
 
   const index = new LocalIndex(indexDir);
   if (await index.isIndexCreated()) {

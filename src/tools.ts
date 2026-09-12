@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { ToolSchema } from "./llm.js";
+import type { ToolSchema } from "./providers/llm.js";
 
 export const consultarStatusFaturaSchema: ToolSchema = {
   name: "consultar_status_fatura",
