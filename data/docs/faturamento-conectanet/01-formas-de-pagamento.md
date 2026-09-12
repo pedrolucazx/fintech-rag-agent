@@ -7,11 +7,17 @@ aplicativo, ao selecionar a fatura que deseja pagar.
 
 ## PIX
 
-O pagamento via PIX é processado na hora — assim que o pagamento é
-confirmado pelo seu banco, a fatura já aparece como paga no app da
-ConectaNet, geralmente em poucos minutos. O QR Code ou o "copia e cola" da
-fatura fica disponível na tela de detalhes da fatura, dentro da aba
-Financeiro.
+Para pagar uma fatura via PIX:
+
+1. Abra o app da ConectaNet e vá até a aba **Financeiro**.
+2. Selecione a fatura que deseja pagar.
+3. Toque em **"Pagar com PIX"**.
+
+Na tela que aparecer, você pode escanear o QR Code com o app do seu banco,
+ou tocar em **"Copiar código PIX"** e colar (copia e cola) diretamente no
+app do banco. O pagamento é processado na hora — assim que confirmado pelo
+seu banco, a fatura já aparece como paga no app da ConectaNet, geralmente em
+poucos minutos.
 
 ## Boleto bancário
 
@@ -22,16 +28,30 @@ banking. Diferente do PIX, a compensação do boleto pode levar até 2 dias
 
 ## Débito automático
 
-A ConectaNet oferece débito automático em duas modalidades:
+A ConectaNet oferece débito automático em duas modalidades: débito em conta
+corrente e PIX Automático (ver abaixo).
 
-- **Débito em conta corrente** — o modelo tradicional: você autoriza o
-  débito no seu banco, e o valor da fatura é descontado automaticamente da
-  conta cadastrada, todo mês, próximo à data de vencimento.
-- **PIX Automático** — modalidade mais recente, baseada em PIX: você
-  concede a autorização de recorrência direto pelo aplicativo do seu banco
-  (ou lendo um QR Code de autorização), e é o seu banco quem agenda e
-  processa os débitos futuros nas datas combinadas, sem precisar de uma
-  nova aprovação a cada mês.
+Débito em conta corrente é o modelo tradicional: você autoriza o débito no
+seu banco, e o valor da fatura é descontado automaticamente da conta
+cadastrada, todo mês, próximo à data de vencimento.
+
+## PIX Automático
+
+PIX Automático é a modalidade de débito automático mais recente, baseada em
+PIX: você concede a autorização de recorrência direto pelo aplicativo do seu
+banco (ou lendo um QR Code de autorização), e é o seu banco quem agenda e
+processa os débitos futuros nas datas combinadas, sem precisar de uma nova
+aprovação a cada mês.
+
+Para ativar o PIX Automático:
+
+1. Abra o app da ConectaNet e vá até **Financeiro → Forma de pagamento**.
+2. Selecione **"PIX Automático"**.
+3. Você será direcionado pro app do seu banco (ou verá um QR Code de
+   autorização) pra confirmar a recorrência.
+4. Confirme no app do banco — a partir do próximo ciclo, os débitos futuros
+   já ficam agendados automaticamente, sem precisar de nova aprovação todo
+   mês.
 
 Nos dois casos, você não precisa entrar no app da ConectaNet pra pagar
 manualmente. Caso o débito não seja concluído por falta de saldo, a fatura

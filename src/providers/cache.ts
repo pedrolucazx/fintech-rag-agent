@@ -1,4 +1,5 @@
 import Redis from "ioredis";
+import { log } from "../logger.js";
 
 const REDIS_URL = "redis://localhost:6379";
 
@@ -37,9 +38,11 @@ export async function getOrSet<T>(
     console.warn("[cache] Redis read failed, skipping cache", { err: String(err) });
   }
   if (cached !== null) {
+    log.info("cache hit", { key: key.slice(0, 60) });
     return JSON.parse(cached) as T;
   }
 
+  log.info("cache miss, calling fn()", { key: key.slice(0, 60) });
   const value = await fn();
 
   try {

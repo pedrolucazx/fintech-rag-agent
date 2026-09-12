@@ -24,7 +24,7 @@ test("returns text directly when the LLM responds with final text", async () => 
 });
 
 test("consults invoices and preserves the tool exchange for the next turn", async () => {
-  for (const id of ["fat_202509", "fat_000000"]) {
+  for (const id of ["fat_202609", "fat_000000"]) {
     let calls = 0;
     const mockChat = async (messages: ChatMessage[], tools: ToolSchema[]): Promise<ChatResult> => {
       assert.deepEqual(tools, [consultarStatusFaturaSchema, abrirTicketSchema]);
@@ -37,14 +37,14 @@ test("consults invoices and preserves the tool exchange for the next turn", asyn
       assert.equal(tool.role, "tool");
       assert.deepEqual(tool.toolCall, assistant.toolCall);
       const invoice = JSON.parse(tool.content);
-      assert.deepEqual(invoice, id === "fat_202509"
+      assert.deepEqual(invoice, id === "fat_202609"
         ? { id, status: "paga", valor: 99.9, vencimento: "2026-09-10" }
         : { id, status: "nao_encontrado" });
       return { type: "text", content: invoice.status };
     };
     const chatId = `invoice-${id}`;
     assert.equal(await runHarness(chatId, `Minha fatura ${id} já foi paga?`, mockChat, mockRetrieve),
-      id === "fat_202509" ? "paga" : "nao_encontrado");
+      id === "fat_202609" ? "paga" : "nao_encontrado");
     assert.equal(calls, 2);
     await runHarness(chatId, "Qual era a fatura?", async (messages) => {
       assert.equal(messages.find((message) => message.role === "tool")?.toolCall?.args.id, id);
@@ -62,10 +62,10 @@ test("asks for a missing identifier and consults after the user supplies it", as
     return { type: "text", content: "Qual o identificador da fatura?" };
   }, mockRetrieve), "Qual o identificador da fatura?");
   let calls = 0;
-  assert.equal(await runHarness(chatId, "fat_202509", async (messages) => {
+  assert.equal(await runHarness(chatId, "fat_202609", async (messages) => {
     if (++calls === 1) {
       assert.equal(messages.at(-2)?.content, "Qual o identificador da fatura?");
-      return { type: "tool_call", name: "consultar_status_fatura", args: { id: "fat_202509" } };
+      return { type: "tool_call", name: "consultar_status_fatura", args: { id: "fat_202609" } };
     }
     return { type: "text", content: JSON.parse(messages.at(-1)!.content).status };
   }, mockRetrieve), "paga");
@@ -92,7 +92,7 @@ test("LLM adapter sends the assistant tool call and matching result over the SDK
   let calls = 0;
   const toolCall = {
     id: "call-sdk-invoice", type: "function",
-    function: { name: "consultar_status_fatura", arguments: '{"id":"fat_202509"}' },
+    function: { name: "consultar_status_fatura", arguments: '{"id":"fat_202609"}' },
   };
   t.mock.method(globalThis, "fetch", async (_input: unknown, init: RequestInit) => {
     const body = JSON.parse(init.body as string);
@@ -107,11 +107,11 @@ test("LLM adapter sends the assistant tool call and matching result over the SDK
     assert.deepEqual(body.messages.at(-2), { role: "assistant", content: "", tool_calls: [toolCall] });
     assert.deepEqual(body.messages.at(-1), {
       role: "tool", tool_call_id: toolCall.id,
-      content: JSON.stringify({ id: "fat_202509", status: "paga", valor: 99.9, vencimento: "2026-09-10" }),
+      content: JSON.stringify({ id: "fat_202609", status: "paga", valor: 99.9, vencimento: "2026-09-10" }),
     });
     return Response.json({ choices: [{ message: { role: "assistant", content: "Sua fatura está paga." } }] });
   });
-  assert.equal(await runHarness("invoice-sdk", `Minha fatura fat_202509 já foi paga? ${crypto.randomUUID()}`, undefined, mockRetrieve), "Sua fatura está paga.");
+  assert.equal(await runHarness("invoice-sdk", `Minha fatura fat_202609 já foi paga? ${crypto.randomUUID()}`, undefined, mockRetrieve), "Sua fatura está paga.");
   assert.equal(calls, 2);
 });
 

@@ -6,10 +6,18 @@ import type { ToolSchema } from "./providers/llm.js";
 
 export const consultarStatusFaturaSchema: ToolSchema = {
   name: "consultar_status_fatura",
-  description: "Consulta o status da fatura/pagamento do próprio cliente a partir do identificador informado",
+  description:
+    "Consulta o status da fatura/pagamento do próprio cliente a partir do identificador ou do mês de referência informado",
   parameters: {
     type: "object",
-    properties: { id: { type: "string", description: "Identificador da fatura" } },
+    properties: {
+      id: {
+        type: "string",
+        description:
+          "Identificador da fatura (ex.: fat_202609) ou o mês de referência como o cliente naturalmente diria " +
+          "(ex.: 'setembro', 'setembro de 2026', '09/2026', '2026-09')",
+      },
+    },
     required: ["id"],
   },
 };
@@ -22,7 +30,7 @@ type SimulatedInvoice = {
 };
 
 const invoices: SimulatedInvoice[] = [
-  { id: "fat_202509", status: "paga", valor: 99.9, vencimento: "2026-09-10" },
+  { id: "fat_202609", status: "paga", valor: 99.9, vencimento: "2026-09-10" },
   { id: "fat_202610", status: "pendente", valor: 99.9, vencimento: "2026-10-10" },
   { id: "fat_202608", status: "vencida", valor: 99.9, vencimento: "2026-08-10" },
 ];
@@ -34,10 +42,49 @@ function requireText(value: unknown, errorMessage: string): string {
   return value.trim();
 }
 
+// ponytail: year defaults to the lab's fake corpus year when the customer
+// says just a month name with no year ("setembro"). Real system would derive
+// this from the current date instead of a constant.
+const DEFAULT_INVOICE_YEAR = "2026";
+
+const MONTHS_PT: Record<string, string> = {
+  janeiro: "01", fevereiro: "02", "março": "03", marco: "03", abril: "04",
+  maio: "05", junho: "06", julho: "07", agosto: "08", setembro: "09",
+  outubro: "10", novembro: "11", dezembro: "12",
+};
+
+/**
+ * Accepts either a literal invoice id (fat_YYYYMM) or a natural month
+ * reference ("setembro", "setembro de 2026", "09/2026", "2026-09") and
+ * resolves it to the fat_YYYYMM id — customers refer to a fatura by month,
+ * not by an opaque id, so the tool normalizes instead of relying on the LLM
+ * to construct the id string itself.
+ */
+function resolveInvoiceId(raw: string): string {
+  const value = raw.trim().toLowerCase();
+  if (/^fat_\d{6}$/.test(value)) return value;
+
+  const isoMatch = value.match(/^(\d{4})-(\d{2})$/);
+  if (isoMatch) return `fat_${isoMatch[1]}${isoMatch[2]}`;
+
+  const slashMatch = value.match(/^(\d{2})\/(\d{4})$/);
+  if (slashMatch) return `fat_${slashMatch[2]}${slashMatch[1]}`;
+
+  for (const [name, mm] of Object.entries(MONTHS_PT)) {
+    if (value.includes(name)) {
+      const year = value.match(/\d{4}/)?.[0] ?? DEFAULT_INVOICE_YEAR;
+      return `fat_${year}${mm}`;
+    }
+  }
+
+  return raw.trim();
+}
+
 export async function consultarStatusFatura(args: Record<string, unknown>): Promise<
   SimulatedInvoice | { id: string; status: "nao_encontrado" }
 > {
-  const id = requireText(args.id, "Peça ao cliente o identificador da fatura antes de consultar.");
+  const rawId = requireText(args.id, "Peça ao cliente o identificador ou o mês da fatura antes de consultar.");
+  const id = resolveInvoiceId(rawId);
   const invoice = invoices.find((invoice) => invoice.id === id);
   return invoice ? { ...invoice } : { id, status: "nao_encontrado" };
 }

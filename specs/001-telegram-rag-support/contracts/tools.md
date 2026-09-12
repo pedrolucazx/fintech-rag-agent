@@ -25,7 +25,7 @@ Cobre User Story 2 / FR-004.
 
 **Output**:
 ```json
-{ "id": "fat_202509", "status": "paga", "valor": 99.9, "vencimento": "2026-09-10" }
+{ "id": "fat_202609", "status": "paga", "valor": 99.9, "vencimento": "2026-09-10" }
 ```
 ou, se não encontrado:
 ```json

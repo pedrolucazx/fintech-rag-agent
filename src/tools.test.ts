@@ -14,22 +14,42 @@ import {
 test("invoice schema matches the tool contract", () => {
   assert.deepEqual(consultarStatusFaturaSchema, {
     name: "consultar_status_fatura",
-    description: "Consulta o status da fatura/pagamento do próprio cliente a partir do identificador informado",
+    description:
+      "Consulta o status da fatura/pagamento do próprio cliente a partir do identificador ou do mês de referência informado",
     parameters: {
       type: "object",
-      properties: { id: { type: "string", description: "Identificador da fatura" } },
+      properties: {
+        id: {
+          type: "string",
+          description:
+            "Identificador da fatura (ex.: fat_202609) ou o mês de referência como o cliente naturalmente diria " +
+            "(ex.: 'setembro', 'setembro de 2026', '09/2026', '2026-09')",
+        },
+      },
       required: ["id"],
     },
   });
 });
 
 test("returns a simulated invoice or a valid not-found result", async () => {
-  assert.deepEqual(await consultarStatusFatura({ id: "fat_202509" }), {
-    id: "fat_202509", status: "paga", valor: 99.9, vencimento: "2026-09-10",
+  assert.deepEqual(await consultarStatusFatura({ id: "fat_202609" }), {
+    id: "fat_202609", status: "paga", valor: 99.9, vencimento: "2026-09-10",
   });
   for (const id of ["fat_000000", "toString", "__proto__"]) {
     assert.deepEqual(await consultarStatusFatura({ id }), { id, status: "nao_encontrado" });
   }
+});
+
+test("resolves a natural month reference to the matching invoice", async () => {
+  for (const id of ["setembro", "Setembro de 2026", "09/2026", "2026-09", "SETEMBRO"]) {
+    assert.deepEqual(await consultarStatusFatura({ id }), {
+      id: "fat_202609", status: "paga", valor: 99.9, vencimento: "2026-09-10",
+    });
+  }
+  // "outubro" alone defaults to the lab's fake corpus year (2026)
+  assert.deepEqual(await consultarStatusFatura({ id: "outubro" }), {
+    id: "fat_202610", status: "pendente", valor: 99.9, vencimento: "2026-10-10",
+  });
 });
 
 test("rejects missing, blank or non-string identifiers", async () => {
@@ -62,7 +82,7 @@ test("appends tickets with the conversation id and returns its identifier", asyn
   try {
     const [first, second] = await Promise.all([
       abrirTicket(
-        { subject: "Cobrança duplicada", description: "A fatura fat_202509 foi debitada duas vezes." },
+        { subject: "Cobrança duplicada", description: "A fatura fat_202609 foi debitada duas vezes." },
         "chat-test", ticketsPath,
       ),
       abrirTicket(
@@ -75,7 +95,7 @@ test("appends tickets with the conversation id and returns its identifier", asyn
     assert.equal(tickets.length, 2);
     assert.deepEqual(tickets.map(({ id, createdAt }) => ({ id, createdAt })), [first, second]);
     assert.equal(tickets[0].subject, "Cobrança duplicada");
-    assert.equal(tickets[0].description, "A fatura fat_202509 foi debitada duas vezes.");
+    assert.equal(tickets[0].description, "A fatura fat_202609 foi debitada duas vezes.");
     assert.equal(tickets[0].chatId, "chat-test");
   } finally {
     await rm(directory, { recursive: true, force: true });
