@@ -1,7 +1,12 @@
 try {
   process.loadEnvFile();
-} catch {
-  // .env not present — rely on real environment variables (e.g. CI)
+} catch (err) {
+  // Missing .env is fine (e.g. CI sets real env vars instead) — anything
+  // else (a malformed .env, a permission error) should fail loudly, not
+  // silently leave every var unset.
+  if (!(err instanceof Error && "code" in err && err.code === "ENOENT")) {
+    throw err;
+  }
 }
 
 function required(name: string): string {
