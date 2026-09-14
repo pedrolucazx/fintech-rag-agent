@@ -137,6 +137,27 @@ function currentModel(): string {
   return config.llmProvider === "gemini" ? config.geminiModel : config.nvidiaModel;
 }
 
+class FallbackLlmProvider implements LlmProvider {
+  constructor(
+    private readonly primary: LlmProvider,
+    private readonly secondary: LlmProvider,
+    private readonly secondaryName: string,
+  ) {}
+
+  async chat(messages: ChatMessage[], tools: ToolSchema[], chatId?: string): Promise<ChatResult> {
+    try {
+      return await this.primary.chat(messages, tools, chatId);
+    } catch (err) {
+      log.warn("primary LLM provider failed, falling back", {
+        chatId,
+        fallbackTo: this.secondaryName,
+        err: String(err),
+      });
+      return this.secondary.chat(messages, tools, chatId);
+    }
+  }
+}
+
 class CachedLlmProvider implements LlmProvider {
   constructor(
     private readonly inner: LlmProvider,
@@ -167,7 +188,9 @@ function getProvider(): LlmProvider {
         `Unknown LLM_PROVIDER: "${name}" (expected one of: ${Object.keys(factories).join(", ")})`,
       );
     }
-    instance = new CachedLlmProvider(factory(), name);
+    const fallbackName = name === "nvidia" ? "gemini" : "nvidia";
+    const withFallback = new FallbackLlmProvider(factory(), factories[fallbackName](), fallbackName);
+    instance = new CachedLlmProvider(withFallback, name);
     instances.set(name, instance);
   }
   return instance;

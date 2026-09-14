@@ -149,6 +149,7 @@ Simplificações deliberadas, com o teto de cada uma e quando revisitar:
 - **Ano padrão de fatura fixo no corpus fake** (`tools.ts`, `DEFAULT_INVOICE_YEAR`): quando o cliente diz só o mês ("setembro"), sem ano, assume o ano do corpus fake do lab (2026). Um sistema real derivaria isso da data atual, não de uma constante.
 - **Provider (LLM/embeddings) sem registry genérico** (`providers/llm.ts`, `providers/embeddings.ts`): singleton por nome, escolhido uma vez via env var — sem container de DI nem plugin system, porque este processo nunca precisa de duas instâncias vivas do mesmo provider ao mesmo tempo. Revisitar se algum dia for necessário multi-tenant com provider por request/instância.
 - **Cache Redis best-effort** (`providers/cache.ts`): qualquer falha de leitura/escrita no Redis é logada e ignorada, caindo direto pra chamada real — uma queda do Redis nunca derruba o bot, só perde o cache.
+- **Fallback de LLM sem rótulo próprio no cache** (`providers/llm.ts`, `FallbackLlmProvider`): se o provider primário falhar e o secundário responder, a chave de cache continua rotulada com o nome/modelo do primário — a resposta em si é válida, só a proveniência no log/cache não reflete que veio do fallback. Rastrear a proveniência de verdade exigiria separar a chave por resultado real, não por provider configurado; não vale a pena pra um caminho que só roda quando o primário já está fora do ar.
 
 ## Documentação Completa
 

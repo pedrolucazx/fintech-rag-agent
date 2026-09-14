@@ -108,3 +108,36 @@ test("rejects an unrecognized LLM_PROVIDER instead of silently falling back", as
   process.env.LLM_PROVIDER = "voyage";
   await assert.rejects(chat([], []), /Unknown LLM_PROVIDER: "voyage"/);
 });
+
+test("falls back to the secondary provider when the primary fails", async (t) => {
+  const { chat } = await import("./llm.js");
+  const { closeCache } = await import("./cache.js");
+  const previous = {
+    LLM_PROVIDER: process.env.LLM_PROVIDER,
+    NVIDIA_API_KEY: process.env.NVIDIA_API_KEY,
+    GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+  };
+  t.after(async () => {
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+    await closeCache();
+  });
+  process.env.LLM_PROVIDER = "nvidia";
+  process.env.NVIDIA_API_KEY = "test-nvidia-key";
+  process.env.GEMINI_API_KEY = "test-gemini-key";
+  t.mock.method(globalThis, "fetch", async (input: unknown) => {
+    if (String(input).includes("integrate.api.nvidia.com")) {
+      throw new Error("simulated NVIDIA outage");
+    }
+    return Response.json({ choices: [{ message: { content: "resposta do gemini" } }] });
+  });
+  const messages = [
+    { role: "user" as const, content: `fallback-test:${crypto.randomUUID()}` },
+  ];
+  assert.deepEqual(await chat(messages, []), {
+    type: "text",
+    content: "resposta do gemini",
+  });
+});
