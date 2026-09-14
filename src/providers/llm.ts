@@ -76,14 +76,33 @@ function parseChatCompletion(response: OpenAI.Chat.ChatCompletion): ChatResult {
   return { type: "text", content: choice.message.content ?? "" };
 }
 
-abstract class OpenAiCompatibleLlmProvider implements LlmProvider {
-  protected abstract getClient(): OpenAI;
-  protected abstract getModel(): string;
+type OpenAiCompatibleConfig = {
+  baseURL: string;
+  getApiKey: () => string;
+  getModel: () => string;
+  missingKeyMessage?: string;
+};
+
+class OpenAiCompatibleLlmProvider implements LlmProvider {
+  private client?: OpenAI;
+
+  constructor(private readonly options: OpenAiCompatibleConfig) {}
+
+  private getClient(): OpenAI {
+    if (!this.client) {
+      const apiKey = this.options.getApiKey();
+      if (!apiKey && this.options.missingKeyMessage) {
+        throw new Error(this.options.missingKeyMessage);
+      }
+      this.client = new OpenAI({ baseURL: this.options.baseURL, apiKey, maxRetries: 1 });
+    }
+    return this.client;
+  }
 
   async chat(messages: ChatMessage[], tools: ToolSchema[]): Promise<ChatResult> {
     const response = await this.getClient().chat.completions.create(
       {
-        model: this.getModel(),
+        model: this.options.getModel(),
         messages: toOpenAiMessages(messages),
         tools: tools.length > 0 ? tools.map(toOpenAiTool) : undefined,
         parallel_tool_calls: tools.length > 0 ? false : undefined,
@@ -91,45 +110,6 @@ abstract class OpenAiCompatibleLlmProvider implements LlmProvider {
       { timeout: TIMEOUT_MS },
     );
     return parseChatCompletion(response);
-  }
-}
-
-class NvidiaLlmProvider extends OpenAiCompatibleLlmProvider {
-  private client?: OpenAI;
-
-  protected getClient(): OpenAI {
-    if (!this.client) {
-      this.client = new OpenAI({
-        baseURL: "https://integrate.api.nvidia.com/v1",
-        apiKey: config.nvidiaApiKey,
-        maxRetries: 1,
-      });
-    }
-    return this.client;
-  }
-
-  protected getModel(): string {
-    return config.nvidiaModel;
-  }
-}
-
-class GeminiLlmProvider extends OpenAiCompatibleLlmProvider {
-  private client?: OpenAI;
-
-  protected getClient(): OpenAI {
-    if (!this.client) {
-      if (!config.geminiApiKey) throw new Error("GEMINI_API_KEY is required when LLM_PROVIDER=gemini (see .env.example)");
-      this.client = new OpenAI({
-        baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
-        apiKey: config.geminiApiKey,
-        maxRetries: 1,
-      });
-    }
-    return this.client;
-  }
-
-  protected getModel(): string {
-    return config.geminiModel;
   }
 }
 
@@ -172,8 +152,19 @@ class CachedLlmProvider implements LlmProvider {
 }
 
 const factories: Record<string, () => LlmProvider> = {
-  nvidia: () => new NvidiaLlmProvider(),
-  gemini: () => new GeminiLlmProvider(),
+  nvidia: () =>
+    new OpenAiCompatibleLlmProvider({
+      baseURL: "https://integrate.api.nvidia.com/v1",
+      getApiKey: () => config.nvidiaApiKey,
+      getModel: () => config.nvidiaModel,
+    }),
+  gemini: () =>
+    new OpenAiCompatibleLlmProvider({
+      baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
+      getApiKey: () => config.geminiApiKey,
+      getModel: () => config.geminiModel,
+      missingKeyMessage: "GEMINI_API_KEY is required when LLM_PROVIDER=gemini (see .env.example)",
+    }),
 };
 
 const instances = new Map<string, LlmProvider>();
