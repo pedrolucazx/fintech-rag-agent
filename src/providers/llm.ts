@@ -17,40 +17,8 @@ export type ChatResult =
 const TIMEOUT_MS = 15_000;
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
-let nvidiaClient: OpenAI | undefined;
-let geminiClient: OpenAI | undefined;
-
-function getNvidiaClient(): OpenAI {
-  if (!nvidiaClient) {
-    nvidiaClient = new OpenAI({
-      baseURL: "https://integrate.api.nvidia.com/v1",
-      apiKey: config.nvidiaApiKey,
-      maxRetries: 1,
-    });
-  }
-  return nvidiaClient;
-}
-
-function getGeminiClient(): OpenAI {
-  if (!geminiClient) {
-    if (!config.geminiApiKey) {
-      throw new Error("GEMINI_API_KEY is required when LLM_PROVIDER=gemini (see .env.example)");
-    }
-    geminiClient = new OpenAI({
-      baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
-      apiKey: config.geminiApiKey,
-      maxRetries: 1,
-    });
-  }
-  return geminiClient;
-}
-
-function getClient(): OpenAI {
-  return config.llmProvider === "gemini" ? getGeminiClient() : getNvidiaClient();
-}
-
-function getModel(): string {
-  return config.llmProvider === "gemini" ? config.geminiModel : config.nvidiaModel;
+export interface LlmProvider {
+  chat(messages: ChatMessage[], tools: ToolSchema[]): Promise<ChatResult>;
 }
 
 const openAiToolCache = new Map<string, OpenAI.Chat.ChatCompletionTool>();
@@ -68,48 +36,29 @@ function toOpenAiTool(tool: ToolSchema): OpenAI.Chat.ChatCompletionTool {
   return cached;
 }
 
-// ponytail: keyed on message/tool content only, no chatId — two different
-// chats that happen to send byte-identical messages (only realistic for a
-// first message with no history yet) share a cache hit. Adding chatId would
-// mean threading it through chat()'s public signature and every ChatFn
-// caller in harness.ts (touched independently by 3 other in-flight
-// branches right now); also consistent with spec.md's Assumptions, which
-// already document no per-user ownership/isolation elsewhere in this bot.
-// Revisit if per-user isolation is ever added for real.
-function buildCacheKey(messages: ChatMessage[], tools: ToolSchema[]): string {
-  const provider = config.llmProvider;
-  const payload = JSON.stringify({ provider, model: getModel(), messages, tools });
-  return `llm:${provider}:${payload}`;
+function toOpenAiMessages(messages: ChatMessage[]): OpenAI.Chat.ChatCompletionMessageParam[] {
+  return messages.map(({ role, content, toolCall }) => {
+    if (role === "tool") {
+      if (!toolCall?.id) throw new Error("Missing tool call id");
+      return { role, content, tool_call_id: toolCall.id };
+    }
+    if (role === "assistant" && toolCall) {
+      if (!toolCall.id) throw new Error("Missing tool call id");
+      return {
+        role,
+        content,
+        tool_calls: [{
+          id: toolCall.id,
+          type: "function",
+          function: { name: toolCall.name, arguments: JSON.stringify(toolCall.args) },
+        }],
+      };
+    }
+    return { role, content };
+  });
 }
 
-async function callLlm(messages: ChatMessage[], tools: ToolSchema[]): Promise<ChatResult> {
-  const client = getClient();
-  const model = getModel();
-
-  const response = await client.chat.completions.create(
-    {
-      model,
-      messages: messages.map(({ role, content, toolCall }): OpenAI.Chat.ChatCompletionMessageParam => {
-        if (role === "tool") {
-          if (!toolCall?.id) throw new Error("Missing tool call id");
-          return { role, content, tool_call_id: toolCall.id };
-        }
-        if (role === "assistant" && toolCall) {
-          if (!toolCall.id) throw new Error("Missing tool call id");
-          return { role, content, tool_calls: [{
-            id: toolCall.id,
-            type: "function",
-            function: { name: toolCall.name, arguments: JSON.stringify(toolCall.args) },
-          }] };
-        }
-        return { role, content };
-      }),
-      tools: tools.length > 0 ? tools.map(toOpenAiTool) : undefined,
-      parallel_tool_calls: tools.length > 0 ? false : undefined,
-    },
-    { timeout: TIMEOUT_MS },
-  );
-
+function parseChatCompletion(response: OpenAI.Chat.ChatCompletion): ChatResult {
   const choice = response.choices[0];
   const toolCall = choice.message.tool_calls?.[0];
   if (toolCall && "function" in toolCall) {
@@ -122,17 +71,102 @@ async function callLlm(messages: ChatMessage[], tools: ToolSchema[]): Promise<Ch
         err: String(err),
       });
     }
-    return {
-      type: "tool_call",
-      id: toolCall.id,
-      name: toolCall.function.name,
-      args,
-    };
+    return { type: "tool_call", id: toolCall.id, name: toolCall.function.name, args };
   }
   return { type: "text", content: choice.message.content ?? "" };
 }
 
-export async function chat(messages: ChatMessage[], tools: ToolSchema[]): Promise<ChatResult> {
-  const key = buildCacheKey(messages, tools);
-  return getOrSet(key, CACHE_TTL_MS, () => callLlm(messages, tools));
+abstract class OpenAiCompatibleLlmProvider implements LlmProvider {
+  protected abstract getClient(): OpenAI;
+  protected abstract getModel(): string;
+
+  async chat(messages: ChatMessage[], tools: ToolSchema[]): Promise<ChatResult> {
+    const response = await this.getClient().chat.completions.create(
+      {
+        model: this.getModel(),
+        messages: toOpenAiMessages(messages),
+        tools: tools.length > 0 ? tools.map(toOpenAiTool) : undefined,
+        parallel_tool_calls: tools.length > 0 ? false : undefined,
+      },
+      { timeout: TIMEOUT_MS },
+    );
+    return parseChatCompletion(response);
+  }
+}
+
+class NvidiaLlmProvider extends OpenAiCompatibleLlmProvider {
+  private client?: OpenAI;
+
+  protected getClient(): OpenAI {
+    if (!this.client) {
+      this.client = new OpenAI({
+        baseURL: "https://integrate.api.nvidia.com/v1",
+        apiKey: config.nvidiaApiKey,
+        maxRetries: 1,
+      });
+    }
+    return this.client;
+  }
+
+  protected getModel(): string {
+    return config.nvidiaModel;
+  }
+}
+
+class GeminiLlmProvider extends OpenAiCompatibleLlmProvider {
+  private client?: OpenAI;
+
+  protected getClient(): OpenAI {
+    if (!this.client) {
+      if (!config.geminiApiKey) throw new Error("GEMINI_API_KEY is required when LLM_PROVIDER=gemini (see .env.example)");
+      this.client = new OpenAI({
+        baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
+        apiKey: config.geminiApiKey,
+        maxRetries: 1,
+      });
+    }
+    return this.client;
+  }
+
+  protected getModel(): string {
+    return config.geminiModel;
+  }
+}
+
+function currentModel(): string {
+  return config.llmProvider === "gemini" ? config.geminiModel : config.nvidiaModel;
+}
+
+class CachedLlmProvider implements LlmProvider {
+  constructor(
+    private readonly inner: LlmProvider,
+    private readonly providerName: string,
+  ) {}
+
+  chat(messages: ChatMessage[], tools: ToolSchema[]): Promise<ChatResult> {
+    const payload = JSON.stringify({ provider: this.providerName, model: currentModel(), messages, tools });
+    const key = `llm:${this.providerName}:${payload}`;
+    return getOrSet(key, CACHE_TTL_MS, () => this.inner.chat(messages, tools));
+  }
+}
+
+const factories: Record<string, () => LlmProvider> = {
+  nvidia: () => new NvidiaLlmProvider(),
+  gemini: () => new GeminiLlmProvider(),
+};
+
+const instances = new Map<string, LlmProvider>();
+
+function getProvider(): LlmProvider {
+  const name = config.llmProvider.toLowerCase();
+  let instance = instances.get(name);
+  if (!instance) {
+    instance = new CachedLlmProvider((factories[name] ?? factories.nvidia)(), name);
+    instances.set(name, instance);
+  }
+  return instance;
+}
+
+export function chat(messages: ChatMessage[], tools: ToolSchema[]): Promise<ChatResult> {
+  return getProvider().chat(messages, tools);
 }
