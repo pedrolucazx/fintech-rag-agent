@@ -1,12 +1,11 @@
 import Redis from "ioredis";
+import { config } from "../config.js";
 import { log } from "../logger.js";
-
-const REDIS_URL = "redis://localhost:6379";
 
 let client: Redis | undefined;
 function getClient(): Redis {
   if (!client || client.status === "end") {
-    client = new Redis(REDIS_URL, {
+    client = new Redis(config.redisUrl, {
       maxRetriesPerRequest: 1,
       retryStrategy: (times) => {
         if (times > 3) return null;
@@ -15,28 +14,37 @@ function getClient(): Redis {
       lazyConnect: true,
     });
     client.on("error", (err) => {
-      console.warn("[cache] Redis connection error", { err: String(err) });
+      log.warn("Redis connection error", { err: String(err) });
     });
   }
   return client;
 }
 
-// Cache is a best-effort optimization, never a hard dependency: any Redis
-// failure (read or write) is logged and skipped, falling through to fn()
-// directly — a Redis outage must never take down the bot's actual LLM calls.
+async function readFromRedisSafely(key: string): Promise<string | null> {
+  try {
+    const redis = getClient();
+    if (redis.status === "wait") await redis.connect();
+    return await redis.get(key);
+  } catch (err) {
+    log.warn("Redis read failed, skipping cache", { err: String(err) });
+    return null;
+  }
+}
+
+async function writeToRedisSafely(key: string, value: string, ttlMs: number): Promise<void> {
+  try {
+    await getClient().set(key, value, "PX", ttlMs);
+  } catch (err) {
+    log.warn("Redis write failed, continuing without cache", { err: String(err) });
+  }
+}
+
 export async function getOrSet<T>(
   key: string,
   ttlMs: number,
   fn: () => Promise<T>,
 ): Promise<T> {
-  let cached: string | null = null;
-  try {
-    const redis = getClient();
-    if (redis.status === "wait") await redis.connect();
-    cached = await redis.get(key);
-  } catch (err) {
-    console.warn("[cache] Redis read failed, skipping cache", { err: String(err) });
-  }
+  const cached = await readFromRedisSafely(key);
   if (cached !== null) {
     log.info("cache hit", { key: key.slice(0, 60) });
     return JSON.parse(cached) as T;
@@ -44,13 +52,7 @@ export async function getOrSet<T>(
 
   log.info("cache miss, calling fn()", { key: key.slice(0, 60) });
   const value = await fn();
-
-  try {
-    await getClient().set(key, JSON.stringify(value), "PX", ttlMs);
-  } catch (err) {
-    console.warn("[cache] Redis write failed, continuing without cache", { err: String(err) });
-  }
-
+  await writeToRedisSafely(key, JSON.stringify(value), ttlMs);
   return value;
 }
 

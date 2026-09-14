@@ -1,12 +1,9 @@
+import { isNotFoundError } from "./errors.js";
+
 try {
   process.loadEnvFile();
 } catch (err) {
-  // Missing .env is fine (e.g. CI sets real env vars instead) — anything
-  // else (a malformed .env, a permission error) should fail loudly, not
-  // silently leave every var unset.
-  if (!(err instanceof Error && "code" in err && err.code === "ENOENT")) {
-    throw err;
-  }
+  if (!isNotFoundError(err)) throw err;
 }
 
 function required(name: string): string {
@@ -45,5 +42,8 @@ export const config = {
   },
   get voyageApiKey() {
     return optional("VOYAGE_API_KEY", "");
+  },
+  get redisUrl() {
+    return optional("REDIS_URL", "redis://localhost:6379");
   },
 };
