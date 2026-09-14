@@ -97,9 +97,12 @@ src/
 
 | Comando | Descrição |
 |---------|-----------|
-| `npm run dev` | Inicia bot em long polling (tsx) |
+| `npm run dev` | Inicia bot em long polling (tsx, sem build) |
 | `npm run ingest` | Processa `data/docs/**` → embeddings → índice vectra |
 | `npm test` | Roda todos os `src/*.test.ts` (requer Redis rodando) |
+| `npm run typecheck` | `tsc --noEmit` — só checagem de tipos |
+| `npm run build` | Typecheck + transpila `src/` → `dist/` com SWC |
+| `npm start` | Roda o build de produção (`node dist/bot.js`) |
 
 ## Variáveis de Ambiente
 
