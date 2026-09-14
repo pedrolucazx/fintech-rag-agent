@@ -161,12 +161,18 @@ function getProvider(): LlmProvider {
   const name = config.llmProvider.toLowerCase();
   let instance = instances.get(name);
   if (!instance) {
-    instance = new CachedLlmProvider((factories[name] ?? factories.nvidia)(), name);
+    const factory = factories[name];
+    if (!factory) {
+      throw new Error(
+        `Unknown LLM_PROVIDER: "${name}" (expected one of: ${Object.keys(factories).join(", ")})`,
+      );
+    }
+    instance = new CachedLlmProvider(factory(), name);
     instances.set(name, instance);
   }
   return instance;
 }
 
-export function chat(messages: ChatMessage[], tools: ToolSchema[], chatId?: string): Promise<ChatResult> {
+export async function chat(messages: ChatMessage[], tools: ToolSchema[], chatId?: string): Promise<ChatResult> {
   return getProvider().chat(messages, tools, chatId);
 }

@@ -95,16 +95,22 @@ function getProvider(): EmbeddingsProvider {
   const name = currentEmbeddingsProvider();
   let instance = instances.get(name);
   if (!instance) {
-    instance = (factories[name] ?? factories.xenova)();
+    const factory = factories[name];
+    if (!factory) {
+      throw new Error(
+        `Unknown EMBEDDINGS_PROVIDER: "${name}" (expected one of: ${Object.keys(factories).join(", ")})`,
+      );
+    }
+    instance = factory();
     instances.set(name, instance);
   }
   return instance;
 }
 
-export function embed(text: string): Promise<number[]> {
+export async function embed(text: string): Promise<number[]> {
   return getProvider().embed(text);
 }
 
-export function embedBatch(texts: string[]): Promise<number[][]> {
+export async function embedBatch(texts: string[]): Promise<number[][]> {
   return getProvider().embedBatch(texts);
 }

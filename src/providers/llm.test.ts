@@ -97,3 +97,14 @@ test("Gemini sends the configured model and separates its cache entries", async 
   await chat(messages, []);
   assert.deepEqual(models, ["gemini-2.5-flash", "custom-gemini"]);
 });
+
+test("rejects an unrecognized LLM_PROVIDER instead of silently falling back", async (t) => {
+  const { chat } = await import("./llm.js");
+  const previous = process.env.LLM_PROVIDER;
+  t.after(() => {
+    if (previous === undefined) delete process.env.LLM_PROVIDER;
+    else process.env.LLM_PROVIDER = previous;
+  });
+  process.env.LLM_PROVIDER = "voyage";
+  await assert.rejects(chat([], []), /Unknown LLM_PROVIDER: "voyage"/);
+});
