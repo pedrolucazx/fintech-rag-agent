@@ -149,11 +149,19 @@ test("invalid tool arguments return an error to the model without stopping the c
 });
 
 test("LLM adapter sends the assistant tool call and matching result over the SDK transport", async (t) => {
-  const previousKey = process.env.NVIDIA_API_KEY;
+  const previous = {
+    NVIDIA_API_KEY: process.env.NVIDIA_API_KEY,
+    LLM_PROVIDER: process.env.LLM_PROVIDER,
+  };
   process.env.NVIDIA_API_KEY = "test-key";
+  // Uses the real chat() (chatFn: undefined below) — pin LLM_PROVIDER so
+  // this test doesn't depend on whatever's in a developer's real .env.
+  process.env.LLM_PROVIDER = "nvidia";
   t.after(() => {
-    if (previousKey === undefined) delete process.env.NVIDIA_API_KEY;
-    else process.env.NVIDIA_API_KEY = previousKey;
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
   });
   let calls = 0;
   const toolCall = {
