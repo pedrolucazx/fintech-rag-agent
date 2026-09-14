@@ -19,7 +19,7 @@ describe("cache.ts — Redis cache behavior", () => {
 
   test("same key within TTL returns cached value without calling fn again", async () => {
     callCount = 0;
-    const key = "cache:test:same-key";
+    const key = `cache:test:same-key:${randomUUID()}`;
 
     const result1 = await getOrSet(key, 5000, fn);
     const result2 = await getOrSet(key, 5000, fn);
@@ -31,8 +31,8 @@ describe("cache.ts — Redis cache behavior", () => {
 
   test("different key calls fn again", async () => {
     callCount = 0;
-    const key1 = "cache:test:diff-key-1";
-    const key2 = "cache:test:diff-key-2";
+    const key1 = `cache:test:diff-key-1:${randomUUID()}`;
+    const key2 = `cache:test:diff-key-2:${randomUUID()}`;
 
     const result1 = await getOrSet(key1, 5000, fn);
     const result2 = await getOrSet(key2, 5000, fn);
@@ -44,7 +44,7 @@ describe("cache.ts — Redis cache behavior", () => {
 
   test("expired key (TTL elapsed) calls fn again", async () => {
     callCount = 0;
-    const key = "cache:test:expired-key";
+    const key = `cache:test:expired-key:${randomUUID()}`;
 
     const result1 = await getOrSet(key, 50, fn);
     assert.strictEqual(result1.value, 1);
