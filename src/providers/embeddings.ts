@@ -4,6 +4,23 @@ import { log } from "../logger.js";
 
 const EMBEDDING_MODEL = "Xenova/all-MiniLM-L6-v2";
 const TIMEOUT_MS = 15_000;
+const MAX_RATE_LIMIT_RETRIES = 3;
+const BASE_BACKOFF_MS = 1000;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function backoffDelayMs(response: Response, attempt: number): number {
+  const retryAfterHeader = response.headers.get("retry-after");
+  if (retryAfterHeader !== null) {
+    const retryAfterSeconds = Number(retryAfterHeader);
+    if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds >= 0) {
+      return retryAfterSeconds * 1000;
+    }
+  }
+  return BASE_BACKOFF_MS * 2 ** attempt;
+}
 
 export interface EmbeddingsProvider {
   embed(text: string): Promise<number[]>;
@@ -50,14 +67,30 @@ class VoyageEmbeddingsProvider implements EmbeddingsProvider {
         signal: AbortSignal.timeout(TIMEOUT_MS),
       });
 
-    let response;
-    try {
-      response = await request();
-    } catch (err) {
-      log.warn("voyage embeddings call failed, retrying once", {
-        err: String(err),
+    const requestOnce = async (): Promise<Response> => {
+      try {
+        return await request();
+      } catch (err) {
+        log.warn("voyage embeddings call failed, retrying once", {
+          err: String(err),
+        });
+        return request();
+      }
+    };
+
+    let response = await requestOnce();
+    for (
+      let attempt = 0;
+      response.status === 429 && attempt < MAX_RATE_LIMIT_RETRIES;
+      attempt++
+    ) {
+      const delayMs = backoffDelayMs(response, attempt);
+      log.warn("voyage embeddings rate limited, retrying with backoff", {
+        attempt: attempt + 1,
+        delayMs,
       });
-      response = await request();
+      await sleep(delayMs);
+      response = await requestOnce();
     }
 
     if (!response.ok) {
