@@ -8,10 +8,14 @@ import type { ToolSchema } from "./providers/llm.js";
 export const consultarStatusFaturaSchema: ToolSchema = {
   name: "consultar_status_fatura",
   description:
-    "Consulta o status da fatura/pagamento do próprio cliente a partir do identificador ou do mês de referência informado",
+    "Consulta o status da fatura/pagamento do próprio cliente a partir do CPF e do identificador ou mês de referência informados",
   parameters: {
     type: "object",
     properties: {
+      cpf: {
+        type: "string",
+        description: "CPF do cliente, com ou sem pontuação (ex.: 12345678900 ou 123.456.789-00)",
+      },
       id: {
         type: "string",
         description:
@@ -19,32 +23,36 @@ export const consultarStatusFaturaSchema: ToolSchema = {
           "(ex.: 'setembro', 'setembro de 2026', '09/2026', '2026-09')",
       },
     },
-    required: ["id"],
+    required: ["cpf", "id"],
   },
 };
 
 type SimulatedInvoice = {
   id: string;
+  cpf: string;
   status: "pendente" | "paga" | "vencida";
   valor: number; // Reais.
   vencimento: string;
 };
 
 const invoices: SimulatedInvoice[] = [
-  { id: "fat_202609", status: "paga", valor: 99.9, vencimento: "2026-09-10" },
-  {
-    id: "fat_202610",
-    status: "pendente",
-    valor: 99.9,
-    vencimento: "2026-10-10",
-  },
-  {
-    id: "fat_202608",
-    status: "vencida",
-    valor: 99.9,
-    vencimento: "2026-08-10",
-  },
+  // 111.111.111-11 — Plano Básico
+  { id: "fat_202609", cpf: "11111111111", status: "paga", valor: 79.9, vencimento: "2026-09-10" },
+  { id: "fat_202610", cpf: "11111111111", status: "pendente", valor: 79.9, vencimento: "2026-10-10" },
+  { id: "fat_202608", cpf: "11111111111", status: "vencida", valor: 79.9, vencimento: "2026-08-10" },
+  // 222.222.222-22 — Plano Turbo
+  { id: "fat_202609", cpf: "22222222222", status: "paga", valor: 99.9, vencimento: "2026-09-10" },
+  { id: "fat_202610", cpf: "22222222222", status: "pendente", valor: 99.9, vencimento: "2026-10-10" },
+  { id: "fat_202608", cpf: "22222222222", status: "paga", valor: 99.9, vencimento: "2026-08-10" },
+  // 333.333.333-33 — Plano Fibra Max
+  { id: "fat_202609", cpf: "33333333333", status: "vencida", valor: 149.9, vencimento: "2026-09-10" },
+  { id: "fat_202610", cpf: "33333333333", status: "pendente", valor: 149.9, vencimento: "2026-10-10" },
+  { id: "fat_202608", cpf: "33333333333", status: "paga", valor: 149.9, vencimento: "2026-08-10" },
 ];
+
+function normalizeCpf(raw: string): string {
+  return raw.replace(/\D/g, "");
+}
 
 function requireText(value: unknown, errorMessage: string): string {
   if (typeof value !== "string" || !value.trim()) {
@@ -93,14 +101,25 @@ function resolveInvoiceId(raw: string): string {
 
 export async function consultarStatusFatura(
   args: Record<string, unknown>,
-): Promise<SimulatedInvoice | { id: string; status: "nao_encontrado" }> {
+): Promise<
+  Omit<SimulatedInvoice, "cpf"> | { id: string; status: "nao_encontrado" }
+> {
   const rawId = requireText(
     args.id,
     "Peça ao cliente o identificador ou o mês da fatura antes de consultar.",
   );
+  const rawCpf = requireText(
+    args.cpf,
+    "Peça ao cliente o CPF antes de consultar a fatura.",
+  );
+  const cpf = normalizeCpf(rawCpf);
   const id = resolveInvoiceId(rawId);
-  const invoice = invoices.find((invoice) => invoice.id === id);
-  return invoice ? { ...invoice } : { id, status: "nao_encontrado" };
+  const invoice = invoices.find(
+    (invoice) => invoice.id === id && invoice.cpf === cpf,
+  );
+  if (!invoice) return { id, status: "nao_encontrado" };
+  const { cpf: _cpf, ...rest } = invoice;
+  return rest;
 }
 
 export const abrirTicketSchema: ToolSchema = {

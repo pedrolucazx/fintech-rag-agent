@@ -49,6 +49,7 @@ autoatendimento, sem necessidade de framing adicional de persona.
 | Campo | Tipo | Descrição |
 |---|---|---|
 | `id` | string | Identificador da fatura, informado pelo cliente |
+| `cpf` | string | CPF do cliente dono da fatura (normalizado, só dígitos) — usado pra escopar a busca, nunca retornado no resultado da tool |
 | `status` | `"pendente" \| "paga" \| "vencida"` | Status simulado |
 | `valor` | number | Valor da fatura (centavos ou reais, decisão de implementação) |
 | `vencimento` | string | Data de vencimento (ISO `YYYY-MM-DD`) |

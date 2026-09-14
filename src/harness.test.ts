@@ -39,7 +39,7 @@ test("consults invoices and preserves the tool exchange for the next turn", asyn
           type: "tool_call",
           id: "call-invoice",
           name: "consultar_status_fatura",
-          args: { id },
+          args: { id, cpf: "22222222222" },
         };
       }
       const [assistant, tool] = messages.slice(-2);
@@ -116,7 +116,7 @@ test("asks for a missing identifier and consults after the user supplies it", as
           return {
             type: "tool_call",
             name: "consultar_status_fatura",
-            args: { id: "fat_202609" },
+            args: { id: "fat_202609", cpf: "22222222222" },
           };
         }
         return {
@@ -160,7 +160,7 @@ test("LLM adapter sends the assistant tool call and matching result over the SDK
     type: "function",
     function: {
       name: "consultar_status_fatura",
-      arguments: '{"id":"fat_202609"}',
+      arguments: '{"id":"fat_202609","cpf":"22222222222"}',
     },
   };
   t.mock.method(

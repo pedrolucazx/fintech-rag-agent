@@ -21,10 +21,14 @@ test("invoice schema matches the tool contract", () => {
   assert.deepEqual(consultarStatusFaturaSchema, {
     name: "consultar_status_fatura",
     description:
-      "Consulta o status da fatura/pagamento do próprio cliente a partir do identificador ou do mês de referência informado",
+      "Consulta o status da fatura/pagamento do próprio cliente a partir do CPF e do identificador ou mês de referência informados",
     parameters: {
       type: "object",
       properties: {
+        cpf: {
+          type: "string",
+          description: "CPF do cliente, com ou sem pontuação (ex.: 12345678900 ou 123.456.789-00)",
+        },
         id: {
           type: "string",
           description:
@@ -32,24 +36,55 @@ test("invoice schema matches the tool contract", () => {
             "(ex.: 'setembro', 'setembro de 2026', '09/2026', '2026-09')",
         },
       },
-      required: ["id"],
+      required: ["cpf", "id"],
     },
   });
 });
 
 test("returns a simulated invoice or a valid not-found result", async () => {
-  assert.deepEqual(await consultarStatusFatura({ id: "fat_202609" }), {
-    id: "fat_202609",
-    status: "paga",
-    valor: 99.9,
-    vencimento: "2026-09-10",
-  });
+  assert.deepEqual(
+    await consultarStatusFatura({ id: "fat_202609", cpf: "22222222222" }),
+    { id: "fat_202609", status: "paga", valor: 99.9, vencimento: "2026-09-10" },
+  );
   for (const id of ["fat_000000", "toString", "__proto__"]) {
-    assert.deepEqual(await consultarStatusFatura({ id }), {
-      id,
-      status: "nao_encontrado",
+    assert.deepEqual(
+      await consultarStatusFatura({ id, cpf: "22222222222" }),
+      { id, status: "nao_encontrado" },
+    );
+  }
+});
+
+test("accepts a CPF with or without punctuation", async () => {
+  for (const cpf of ["22222222222", "222.222.222-22"]) {
+    assert.deepEqual(await consultarStatusFatura({ id: "fat_202609", cpf }), {
+      id: "fat_202609",
+      status: "paga",
+      valor: 99.9,
+      vencimento: "2026-09-10",
     });
   }
+});
+
+test("scopes invoices by CPF — each customer only sees their own plan", async () => {
+  assert.deepEqual(
+    await consultarStatusFatura({ id: "fat_202609", cpf: "11111111111" }),
+    { id: "fat_202609", status: "paga", valor: 79.9, vencimento: "2026-09-10" },
+  );
+  assert.deepEqual(
+    await consultarStatusFatura({ id: "fat_202609", cpf: "22222222222" }),
+    { id: "fat_202609", status: "paga", valor: 99.9, vencimento: "2026-09-10" },
+  );
+  assert.deepEqual(
+    await consultarStatusFatura({ id: "fat_202609", cpf: "33333333333" }),
+    { id: "fat_202609", status: "vencida", valor: 149.9, vencimento: "2026-09-10" },
+  );
+});
+
+test("a valid invoice id under the wrong CPF is not found", async () => {
+  assert.deepEqual(
+    await consultarStatusFatura({ id: "fat_202609", cpf: "99999999999" }),
+    { id: "fat_202609", status: "nao_encontrado" },
+  );
 });
 
 test("resolves a natural month reference to the matching invoice", async () => {
@@ -60,25 +95,33 @@ test("resolves a natural month reference to the matching invoice", async () => {
     "2026-09",
     "SETEMBRO",
   ]) {
-    assert.deepEqual(await consultarStatusFatura({ id }), {
-      id: "fat_202609",
-      status: "paga",
-      valor: 99.9,
-      vencimento: "2026-09-10",
-    });
+    assert.deepEqual(
+      await consultarStatusFatura({ id, cpf: "22222222222" }),
+      { id: "fat_202609", status: "paga", valor: 99.9, vencimento: "2026-09-10" },
+    );
   }
   // "outubro" alone defaults to the lab's fake corpus year (2026)
-  assert.deepEqual(await consultarStatusFatura({ id: "outubro" }), {
-    id: "fat_202610",
-    status: "pendente",
-    valor: 99.9,
-    vencimento: "2026-10-10",
-  });
+  assert.deepEqual(
+    await consultarStatusFatura({ id: "outubro", cpf: "22222222222" }),
+    { id: "fat_202610", status: "pendente", valor: 99.9, vencimento: "2026-10-10" },
+  );
 });
 
 test("rejects missing, blank or non-string identifiers", async () => {
   for (const id of [undefined, null, "", "   ", 123]) {
-    await assert.rejects(consultarStatusFatura({ id }), /identificador/i);
+    await assert.rejects(
+      consultarStatusFatura({ id, cpf: "22222222222" }),
+      /identificador/i,
+    );
+  }
+});
+
+test("rejects missing, blank or non-string CPFs", async () => {
+  for (const cpf of [undefined, null, "", "   ", 123]) {
+    await assert.rejects(
+      consultarStatusFatura({ id: "fat_202609", cpf }),
+      /cpf/i,
+    );
   }
 });
 

@@ -12,13 +12,14 @@ Cobre User Story 2 / FR-004.
 ```json
 {
   "name": "consultar_status_fatura",
-  "description": "Consulta o status da fatura/pagamento do próprio cliente a partir do identificador informado",
+  "description": "Consulta o status da fatura/pagamento do próprio cliente a partir do CPF e do identificador ou mês de referência informados",
   "parameters": {
     "type": "object",
     "properties": {
-      "id": { "type": "string", "description": "Identificador da fatura" }
+      "cpf": { "type": "string", "description": "CPF do cliente, com ou sem pontuação" },
+      "id": { "type": "string", "description": "Identificador da fatura ou mês de referência" }
     },
-    "required": ["id"]
+    "required": ["cpf", "id"]
   }
 }
 ```
@@ -27,7 +28,7 @@ Cobre User Story 2 / FR-004.
 ```json
 { "id": "fat_202609", "status": "paga", "valor": 99.9, "vencimento": "2026-09-10" }
 ```
-ou, se não encontrado:
+ou, se não encontrado (id inexistente, ou CPF sem fatura para esse mês):
 ```json
 { "id": "fat_000000", "status": "nao_encontrado" }
 ```
@@ -35,9 +36,12 @@ ou, se não encontrado:
 **Contract rules**:
 - Nunca lança exceção para "não encontrado" — é um resultado válido (ver
   data-model.md → SimulatedInvoice).
-- Se o harness chamar esta tool sem `id` resolvido na conversa, o LLM deve
-  ter perguntado o `id` (ou o mês de referência) ao cliente antes
+- Se o harness chamar esta tool sem `cpf`/`id` resolvidos na conversa, o
+  LLM deve ter perguntado o CPF e o mês de referência ao cliente antes
   (responsabilidade do harness/prompt, não da tool).
+- A busca filtra por `(id, cpf)` juntos — um `id` de fatura existente sob
+  um CPF diferente do informado retorna `nao_encontrado`, não os dados de
+  outro cliente. `cpf` nunca é retornado no resultado.
 
 ## `abrir_ticket`
 

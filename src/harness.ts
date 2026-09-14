@@ -27,9 +27,11 @@ const systemPrompt: ChatMessage = {
     "Se o contexto vier vazio ou não cobrir a pergunta, diga uma única vez, em uma frase curta, que " +
     "não tem essa informação — sem rodeio, sem se desculpar, sem inventar. " +
     "Para consultar status de fatura/pagamento, use consultar_status_fatura e responda com base no resultado. " +
-    "Se não houver mês de referência na conversa, pergunte ao cliente o mês (ex.: 'qual fatura, a de " +
+    "A tool exige CPF e mês de referência. Se não houver CPF na conversa, peça o CPF do cliente antes de " +
+    "consultar — nunca assuma ou reutilize o CPF de outra conversa, só o que o próprio cliente informou " +
+    "aqui. Se não houver mês de referência na conversa, pergunte ao cliente o mês (ex.: 'qual fatura, a de " +
     "setembro?') — nunca peça 'o identificador' ou 'o ID', o cliente não pensa nesses termos. " +
-    "Nunca invente ou assuma um mês. Reutilize o mês já informado no histórico. " +
+    "Nunca invente ou assuma um mês. Reutilize o CPF e o mês já informados no histórico desta conversa. " +
     "Na resposta, nunca mencione o identificador interno da fatura (o campo id, tipo fat_202609) — " +
     "refira-se à fatura pelo mês e vencimento, como o cliente falaria. " +
     "Se o resultado for nao_encontrado, informe que não achou fatura para aquele mês e peça para conferir. " +
@@ -64,13 +66,14 @@ async function executeTool(
 ): Promise<string> {
   const tool = toolRegistry.find((t) => t.schema.name === name);
   if (!tool) {
-    log.warn("unknown tool requested by LLM", { name });
+    log.warn("unknown tool requested by LLM", { chatId, name });
     return JSON.stringify({ error: `tool ${name} not found` });
   }
+  log.info("tool called", { chatId, name });
   try {
     return JSON.stringify(await tool.execute(args, chatId));
   } catch (err) {
-    log.warn("tool execution failed", { name, err: String(err) });
+    log.warn("tool execution failed", { chatId, name, err: String(err) });
     return JSON.stringify({
       error: err instanceof Error ? err.message : "Falha ao executar a tool",
     });
@@ -80,6 +83,7 @@ async function executeTool(
 type ChatFn = (
   messages: ChatMessage[],
   tools: ToolSchema[],
+  chatId?: string,
 ) => Promise<ChatResult>;
 
 const chatLocks = new Map<string, Promise<unknown>>();
@@ -138,6 +142,7 @@ async function runHarnessTurn(
     const result = await chatFn(
       messages,
       toolRegistry.map((t) => t.schema),
+      chatId,
     );
 
     if (result.type === "tool_call") {
