@@ -43,14 +43,15 @@ export async function getOrSet<T>(
   key: string,
   ttlMs: number,
   fn: () => Promise<T>,
+  chatId?: string,
 ): Promise<T> {
   const cached = await readFromRedisSafely(key);
   if (cached !== null) {
-    log.info("cache hit", { key: key.slice(0, 60) });
+    log.info("cache hit", { chatId, key: key.slice(0, 60) });
     return JSON.parse(cached) as T;
   }
 
-  log.info("cache miss, calling fn()", { key: key.slice(0, 60) });
+  log.info("cache miss, calling fn()", { chatId, key: key.slice(0, 60) });
   const value = await fn();
   await writeToRedisSafely(key, JSON.stringify(value), ttlMs);
   return value;

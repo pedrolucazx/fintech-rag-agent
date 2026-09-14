@@ -18,7 +18,7 @@ const TIMEOUT_MS = 15_000;
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
 export interface LlmProvider {
-  chat(messages: ChatMessage[], tools: ToolSchema[]): Promise<ChatResult>;
+  chat(messages: ChatMessage[], tools: ToolSchema[], chatId?: string): Promise<ChatResult>;
 }
 
 const openAiToolCache = new Map<string, OpenAI.Chat.ChatCompletionTool>();
@@ -143,10 +143,10 @@ class CachedLlmProvider implements LlmProvider {
     private readonly providerName: string,
   ) {}
 
-  chat(messages: ChatMessage[], tools: ToolSchema[]): Promise<ChatResult> {
+  chat(messages: ChatMessage[], tools: ToolSchema[], chatId?: string): Promise<ChatResult> {
     const payload = JSON.stringify({ provider: this.providerName, model: currentModel(), messages, tools });
     const key = `llm:${this.providerName}:${payload}`;
-    return getOrSet(key, CACHE_TTL_MS, () => this.inner.chat(messages, tools));
+    return getOrSet(key, CACHE_TTL_MS, () => this.inner.chat(messages, tools), chatId);
   }
 }
 
@@ -167,6 +167,6 @@ function getProvider(): LlmProvider {
   return instance;
 }
 
-export function chat(messages: ChatMessage[], tools: ToolSchema[]): Promise<ChatResult> {
-  return getProvider().chat(messages, tools);
+export function chat(messages: ChatMessage[], tools: ToolSchema[], chatId?: string): Promise<ChatResult> {
+  return getProvider().chat(messages, tools, chatId);
 }
