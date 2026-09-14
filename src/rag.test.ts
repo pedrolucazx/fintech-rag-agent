@@ -19,10 +19,7 @@ describe("rag.ts — retrieval", () => {
 
     testIndexDir = mkdtempSync(path.join(tmpdir(), "rag-test-"));
     // Build a test index with fixture data
-    await buildIndex(
-      path.join(process.cwd(), "data", "docs"),
-      testIndexDir,
-    );
+    await buildIndex(path.join(process.cwd(), "data", "docs"), testIndexDir);
   });
 
   after(() => {
@@ -32,13 +29,21 @@ describe("rag.ts — retrieval", () => {
   });
 
   test("retrieve returns the chunk from the expected source for a known question", async () => {
-    const results = await retrieve("quais tipos de chave PIX existem?", 5, testIndexDir);
+    const results = await retrieve(
+      "quais tipos de chave PIX existem?",
+      5,
+      testIndexDir,
+    );
     assert.ok(results.length > 0);
     assert.equal(results[0]?.source, "regulamentacao-pix");
   });
 
   test("retrieve returns an empty list for a question outside the corpus", async () => {
-    const results = await retrieve("por que minha internet caiu ontem?", 5, testIndexDir);
+    const results = await retrieve(
+      "por que minha internet caiu ontem?",
+      5,
+      testIndexDir,
+    );
     assert.deepEqual(results, []);
   });
 });
