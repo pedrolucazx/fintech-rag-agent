@@ -1,7 +1,11 @@
 import { readFileSync, writeFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { LocalIndex } from "vectra";
-import { embed, embedBatch, currentEmbeddingsProvider } from "./providers/embeddings.js";
+import {
+  embed,
+  embedBatch,
+  currentEmbeddingsProvider,
+} from "./providers/embeddings.js";
 import { log } from "./logger.js";
 
 export type RetrievedChunk = {
@@ -24,22 +28,35 @@ function providerFile(indexDir: string): string {
   return path.join(path.dirname(indexDir), "index-provider.json");
 }
 
-/** Records which embeddings provider built the index at `indexDir`, so a later query with a different provider can fail loudly instead of returning meaningless scores. */
-export function recordIndexProvider(indexDir: string = DEFAULT_INDEX_DIR): void {
-  writeFileSync(providerFile(indexDir), JSON.stringify({ provider: currentEmbeddingsProvider() }));
+export function recordIndexProvider(
+  indexDir: string = DEFAULT_INDEX_DIR,
+): void {
+  writeFileSync(
+    providerFile(indexDir),
+    JSON.stringify({ provider: currentEmbeddingsProvider() }),
+  );
+}
+
+function readRecordedProvider(indexDir: string): string | undefined {
+  try {
+    return (
+      JSON.parse(readFileSync(providerFile(indexDir), "utf-8")) as {
+        provider: string;
+      }
+    ).provider;
+  } catch {
+    return undefined;
+  }
 }
 
 function assertProviderMatchesIndex(indexDir: string): void {
-  let recorded: string;
-  try {
-    recorded = (JSON.parse(readFileSync(providerFile(indexDir), "utf-8")) as { provider: string }).provider;
-  } catch {
-    return; // no record (older index or first run) — nothing to compare against
-  }
+  const recorded = readRecordedProvider(indexDir);
+  if (!recorded) return;
   const current = currentEmbeddingsProvider();
   if (recorded !== current) {
     throw new Error(
-      `Index at ${indexDir} was built with EMBEDDINGS_PROVIDER=${recorded}, but the query is running with ${current}. Re-run "npm run ingest" with the same provider, or unset EMBEDDINGS_PROVIDER to match the index.`,
+      `Index at ${indexDir} was built with EMBEDDINGS_PROVIDER=${recorded}, but the query is running with ${current}. 
+      Re-run "npm run ingest" with the same provider, or unset EMBEDDINGS_PROVIDER to match the index.`,
     );
   }
 }
@@ -77,7 +94,9 @@ function collectChunks(docsDir: string = DEFAULT_DOCS_DIR): ChunkToIndex[] {
     if (!entry.isDirectory()) continue;
     const sourceDir = path.join(docsDir, entry.name);
 
-    for (const file of readdirSync(sourceDir).filter((f) => f.endsWith(".md"))) {
+    for (const file of readdirSync(sourceDir).filter((f) =>
+      f.endsWith(".md"),
+    )) {
       const filePath = path.join(sourceDir, file);
       const text = readFileSync(filePath, "utf-8");
       for (const chunkText of splitIntoChunks(text)) {
@@ -89,7 +108,6 @@ function collectChunks(docsDir: string = DEFAULT_DOCS_DIR): ChunkToIndex[] {
   return chunks;
 }
 
-/** Build the vectra index from documents in `docsDir`. Exported for tests and ingest script. */
 export async function buildIndex(
   docsDir: string = DEFAULT_DOCS_DIR,
   indexDir: string = DEFAULT_INDEX_DIR,
@@ -101,7 +119,10 @@ export async function buildIndex(
   }
 
   const embeddings = await embedBatch(chunks.map((c) => c.text));
-  const items = chunks.map((chunk, i) => ({ vector: embeddings[i], metadata: chunk }));
+  const items = chunks.map((chunk, i) => ({
+    vector: embeddings[i],
+    metadata: chunk,
+  }));
 
   const index = new LocalIndex(indexDir);
   if (await index.isIndexCreated()) {
@@ -111,13 +132,16 @@ export async function buildIndex(
   await index.batchInsertItems(items);
   recordIndexProvider(indexDir);
 
-  log.info("ingest complete", { chunks: chunks.length, sources: new Set(chunks.map((c) => c.source)).size });
-  return { chunks: chunks.length, sources: new Set(chunks.map((c) => c.source)).size };
+  log.info("ingest complete", {
+    chunks: chunks.length,
+    sources: new Set(chunks.map((c) => c.source)).size,
+  });
+  return {
+    chunks: chunks.length,
+    sources: new Set(chunks.map((c) => c.source)).size,
+  };
 }
 
-/**
- * Retrieve top‑K most similar chunks for a query.
- */
 export async function retrieve(
   query: string,
   topK = 5,
@@ -131,7 +155,11 @@ export async function retrieve(
   assertProviderMatchesIndex(indexDir);
 
   const queryVector = await embed(query);
-  const results = await index.queryItems<ChunkMetadata>(queryVector, query, topK);
+  const results = await index.queryItems<ChunkMetadata>(
+    queryVector,
+    query,
+    topK,
+  );
 
   return results
     .filter((r) => r.score >= MIN_SCORE)

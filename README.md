@@ -136,6 +136,17 @@ Cobertura atual (24 testes):
 4. **Escopo contido**: Um único serviço Docker (Redis); sem infra extra
 5. **Multi-tenancy ready**: Código preparado para isolamento futuro (já documentado em `spec.md`)
 
+## Decisões e Limites Conhecidos
+
+Simplificações deliberadas, com o teto de cada uma e quando revisitar:
+
+- **Lock por `chatId`, não distribuído** (`harness.ts`, `withChatLock`): uma cadeia de promises em memória, suficiente pra impedir que duas mensagens da MESMA conversa entrelacem o histórico (risco real, já que uma chamada de tool aguarda o LLM no meio do turno). Chats diferentes seguem totalmente concorrentes. Não segura contra múltiplas réplicas do bot — precisaria de um lock distribuído (Redis) se isso rodar como mais de um processo.
+- **Fila de escrita de tickets em processo único** (`tools.ts`, `ticketQueue`): serializa gravações concorrentes em `data/tickets.json` dentro do mesmo processo. Réplicas separadas do bot ainda podem colidir no arquivo. Trocar por um store de verdade (SQLite/DB) se isso rodar como mais de um processo.
+- **Id de ticket sem checagem de unicidade** (`tools.ts`, `tk_${...}`): 6 hex chars (~16M combinações), sem validar contra tickets existentes — risco de colisão desprezível na escala deste projeto. Adicionar checagem de unicidade se o volume de tickets crescer de verdade.
+- **Ano padrão de fatura fixo no corpus fake** (`tools.ts`, `DEFAULT_INVOICE_YEAR`): quando o cliente diz só o mês ("setembro"), sem ano, assume o ano do corpus fake do lab (2026). Um sistema real derivaria isso da data atual, não de uma constante.
+- **Provider (LLM/embeddings) sem registry genérico** (`providers/llm.ts`, `providers/embeddings.ts`): singleton por nome, escolhido uma vez via env var — sem container de DI nem plugin system, porque este processo nunca precisa de duas instâncias vivas do mesmo provider ao mesmo tempo. Revisitar se algum dia for necessário multi-tenant com provider por request/instância.
+- **Cache Redis best-effort** (`providers/cache.ts`): qualquer falha de leitura/escrita no Redis é logada e ignorada, caindo direto pra chamada real — uma queda do Redis nunca derruba o bot, só perde o cache.
+
 ## Documentação Completa
 
 - **Spec**: [`specs/001-telegram-rag-support/spec.md`](specs/001-telegram-rag-support/spec.md)

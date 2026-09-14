@@ -1,5 +1,10 @@
 import { randomUUID } from "node:crypto";
-import { chat, type ChatMessage, type ChatResult, type ToolSchema } from "./providers/llm.js";
+import {
+  chat,
+  type ChatMessage,
+  type ChatResult,
+  type ToolSchema,
+} from "./providers/llm.js";
 import { history } from "./history.js";
 import { log } from "./logger.js";
 import {
@@ -35,7 +40,8 @@ function contextMessage(chunks: RetrievedChunk[]): ChatMessage {
   const content =
     chunks.length === 0
       ? "Contexto: nenhum documento relevante encontrado."
-      : "Contexto:\n" + chunks.map((c) => `[fonte: ${c.source}] ${c.text}`).join("\n\n");
+      : "Contexto:\n" +
+        chunks.map((c) => `[fonte: ${c.source}] ${c.text}`).join("\n\n");
   return { role: "system", content };
 }
 
@@ -49,7 +55,11 @@ const toolRegistry: ToolDefinition[] = [
   { schema: abrirTicketSchema, execute: abrirTicket },
 ];
 
-async function executeTool(name: string, args: Record<string, unknown>, chatId: string): Promise<string> {
+async function executeTool(
+  name: string,
+  args: Record<string, unknown>,
+  chatId: string,
+): Promise<string> {
   const tool = toolRegistry.find((t) => t.schema.name === name);
   if (!tool) {
     log.warn("unknown tool requested by LLM", { name });
@@ -59,16 +69,17 @@ async function executeTool(name: string, args: Record<string, unknown>, chatId: 
     return JSON.stringify(await tool.execute(args, chatId));
   } catch (err) {
     log.warn("tool execution failed", { name, err: String(err) });
-    return JSON.stringify({ error: err instanceof Error ? err.message : "Falha ao executar a tool" });
+    return JSON.stringify({
+      error: err instanceof Error ? err.message : "Falha ao executar a tool",
+    });
   }
 }
 
-type ChatFn = (messages: ChatMessage[], tools: ToolSchema[]) => Promise<ChatResult>;
+type ChatFn = (
+  messages: ChatMessage[],
+  tools: ToolSchema[],
+) => Promise<ChatResult>;
 
-// ponytail: per-chatId promise chain, not a distributed lock — enough to stop two
-// in-flight messages for the SAME chat from interleaving history.append calls
-// (a real risk since a tool-call round trip awaits an LLM call mid-turn). Different
-// chatIds still run fully concurrently.
 const chatLocks = new Map<string, Promise<unknown>>();
 function withChatLock<T>(chatId: string, fn: () => Promise<T>): Promise<T> {
   const prev = chatLocks.get(chatId) ?? Promise.resolve();
@@ -85,13 +96,19 @@ function withChatLock<T>(chatId: string, fn: () => Promise<T>): Promise<T> {
 
 const MAX_TOOL_ITERATIONS = 5;
 
+function resolveToolCallId(id: string | undefined): string {
+  return id || randomUUID();
+}
+
 export async function runHarness(
   chatId: string,
   userMessage: string,
   chatFn: ChatFn = chat,
   retrieveFn: (query: string) => Promise<RetrievedChunk[]> = retrieve,
 ): Promise<string> {
-  return withChatLock(chatId, () => runHarnessTurn(chatId, userMessage, chatFn, retrieveFn));
+  return withChatLock(chatId, () =>
+    runHarnessTurn(chatId, userMessage, chatFn, retrieveFn),
+  );
 }
 
 async function runHarnessTurn(
@@ -100,14 +117,21 @@ async function runHarnessTurn(
   chatFn: ChatFn,
   retrieveFn: (query: string) => Promise<RetrievedChunk[]>,
 ): Promise<string> {
-  history.append(chatId, { role: "user", content: userMessage, toolCall: null, timestamp: Date.now() });
+  history.append(chatId, {
+    role: "user",
+    content: userMessage,
+    toolCall: null,
+    timestamp: Date.now(),
+  });
   const retrievedChunks = await retrieveFn(userMessage);
 
   for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
     const messages: ChatMessage[] = [
       systemPrompt,
       contextMessage(retrievedChunks),
-      ...history.get(chatId).map(({ role, content, toolCall }) => ({ role, content, toolCall })),
+      ...history
+        .get(chatId)
+        .map(({ role, content, toolCall }) => ({ role, content, toolCall })),
     ];
     const result = await chatFn(
       messages,
@@ -115,11 +139,16 @@ async function runHarnessTurn(
     );
 
     if (result.type === "tool_call") {
-      // `||`, not `??` — a provider-returned empty string is falsy-but-defined
-      // and should be treated as "no id" same as null/undefined.
-      const toolCall = { id: result.id || randomUUID(), name: result.name, args: result.args };
+      const toolCall = {
+        id: resolveToolCallId(result.id),
+        name: result.name,
+        args: result.args,
+      };
       history.append(chatId, {
-        role: "assistant", content: "", toolCall, timestamp: Date.now(),
+        role: "assistant",
+        content: "",
+        toolCall,
+        timestamp: Date.now(),
       });
       const toolResult = await executeTool(result.name, result.args, chatId);
       history.append(chatId, {
@@ -131,12 +160,26 @@ async function runHarnessTurn(
       continue;
     }
 
-    history.append(chatId, { role: "assistant", content: result.content, toolCall: null, timestamp: Date.now() });
+    history.append(chatId, {
+      role: "assistant",
+      content: result.content,
+      toolCall: null,
+      timestamp: Date.now(),
+    });
     return result.content;
   }
 
-  const fallback = "Não consegui concluir sua solicitação agora, pode tentar de novo?";
-  log.warn("tool-call loop hit MAX_TOOL_ITERATIONS", { chatId, MAX_TOOL_ITERATIONS });
-  history.append(chatId, { role: "assistant", content: fallback, toolCall: null, timestamp: Date.now() });
+  const fallback =
+    "Não consegui concluir sua solicitação agora, pode tentar de novo?";
+  log.warn("tool-call loop hit MAX_TOOL_ITERATIONS", {
+    chatId,
+    MAX_TOOL_ITERATIONS,
+  });
+  history.append(chatId, {
+    role: "assistant",
+    content: fallback,
+    toolCall: null,
+    timestamp: Date.now(),
+  });
   return fallback;
 }
